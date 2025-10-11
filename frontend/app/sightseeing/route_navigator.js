@@ -6,37 +6,7 @@ function generateStampRallyHTML() {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>京都スタンプラリー</title>
-  <style>
-    body{font-family: system-ui, -apple-system, "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "メイリオ", Meiryo, sans-serif; padding:20px; background: #f5f1e8; min-height:100vh;}
-    .container{max-width:800px;margin:0 auto;background:#faf8f3;padding:30px;border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.1);border:2px solid #e8dcc6}
-    
-    /* スタンプUI用スタイル */
-    .stamp-container{display:flex;flex-direction:column;align-items:center;margin:30px 0;background:#f5f1e8;padding:25px;border-radius:15px;border:3px solid #d4c4a8}
-    .stamp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:20px 0}
-    .stamp-slot{width:100px;height:100px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.3s ease;border:4px solid #d4c4a8;position:relative}
-    .stamp-slot.visited{background:#d4c4a8;border-color:#8b4513;color:#8b4513;box-shadow:0 8px 16px rgba(139,69,19,0.3);animation:pulse 2s infinite}
-    .stamp-slot.placeholder{background:#e8dcc6;border-color:#c4b5a0;color:#8b7355}
-    .stamp-slot:hover{transform:scale(1.15);box-shadow:0 12px 24px rgba(0,0,0,0.2)}
-    .stamp-icon{font-size:32px;font-weight:bold;margin-bottom:4px}
-    .stamp-text{font-size:11px;text-align:center;line-height:1.2;font-weight:bold}
-    .stamp-title{font-size:28px;font-weight:bold;color:#8b4513;margin-bottom:12px;text-shadow:2px 2px 4px rgba(0,0,0,0.1)}
-    .stamp-subtitle{font-size:16px;color:#8b7355;margin-bottom:24px}
-    .progress-bar{width:100%;height:8px;background:#e8dcc6;border-radius:4px;margin:20px 0;overflow:hidden;border:2px solid #d4c4a8}
-    .progress-fill{height:100%;background:linear-gradient(90deg, #8b4513, #a0522d);transition:width 0.5s ease;border-radius:4px}
-    .stats{display:flex;justify-content:space-around;margin:20px 0;padding:15px;background:#f5f1e8;border-radius:12px;border:2px solid #d4c4a8}
-    .stat-item{text-align:center}
-    .stat-number{font-size:24px;font-weight:bold;color:#8b4513}
-    .stat-label{font-size:12px;color:#8b7355;margin-top:4px}
-    
-    @keyframes pulse {
-      0% { box-shadow: 0 8px 16px rgba(139,69,19,0.3); }
-      50% { box-shadow: 0 8px 16px rgba(139,69,19,0.6); }
-      100% { box-shadow: 0 8px 16px rgba(139,69,19,0.3); }
-    }
-    
-    .loading{text-align:center;padding:20px;color:#8b7355}
-    .error{background:#ffe6e6;color:#d00;padding:12px;border-radius:6px;margin:12px 0}
-  </style>
+  <link rel="stylesheet" href="../../static/css/sightseeing/sightseeing.css">
 </head>
 <body>
   <div class="container">
@@ -79,9 +49,9 @@ function generateStampRallyHTML() {
     </div>
 
     <!-- スタンプ詳細モーダル -->
-    <div id="stampModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;z-index:10000">
-      <div style="position:relative;max-width:600px;max-height:80vh;background:#faf8f3;padding:30px;border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.3);border:3px solid #8b4513">
-        <button id="stampModalClose" style="position:absolute;right:15px;top:15px;border:none;background:#8b4513;color:#f5f1e8;width:40px;height:40px;border-radius:20px;cursor:pointer;font-size:20px;box-shadow:0 4px 8px rgba(139,69,19,0.3)">✕</button>
+    <div id="stampModal" class="modal">
+      <div class="modal-content">
+        <button id="stampModalClose" class="modal-close">✕</button>
         <div id="stampModalContent" style="text-align:center;max-height:70vh;overflow:auto">
           <!-- スタンプ詳細がここに挿入されます -->
         </div>
@@ -89,16 +59,16 @@ function generateStampRallyHTML() {
     </div>
 
     <!-- 初回表示用 QR モーダル -->
-    <div id="qrIntroModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;z-index:10002">
-      <div style="position:relative;max-width:520px;background:#faf8f3;padding:30px;border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.3);text-align:center;border:3px solid #8b4513">
-        <button id="qrIntroClose" style="position:absolute;right:15px;top:15px;border:none;background:#8b4513;color:#f5f1e8;width:40px;height:40px;border-radius:20px;cursor:pointer;font-size:20px;box-shadow:0 4px 8px rgba(139,69,19,0.3)">✕</button>
+    <div id="qrIntroModal" class="modal qr-modal">
+      <div class="modal-content qr-modal-content">
+        <button id="qrIntroClose" class="modal-close">✕</button>
         <h2 style="margin-top:0;color:#8b4513">🏯 京都スタンプラリー</h2>
         <h3 style="color:#8b7355;margin:10px 0">QRコードを読み取って開始</h3>
         <p style="color:#8b7355;margin-bottom:20px">スマホのカメラでQRコードを読み取ると、同じページが開きます。<br>読み取り後にスタンプラリーが開始されます。</p>
-        <canvas id="qrCanvas" width="220" height="220" style="border:3px solid #d4c4a8;margin:12px auto;display:block;border-radius:12px;background:#fff"></canvas>
+        <canvas id="qrCanvas" width="220" height="220" class="qr-canvas"></canvas>
         <div style="margin-top:20px">
-          <button id="qrConfirmBtn" style="padding:12px 24px;border-radius:25px;background:#8b4513;color:#f5f1e8;border:none;cursor:pointer;font-size:16px;font-weight:bold;box-shadow:0 4px 8px rgba(139,69,19,0.3);margin-right:10px">QR読み取り完了・開始</button>
-          <button id="qrSkipBtn" style="padding:12px 24px;border-radius:25px;background:#d4c4a8;color:#8b4513;border:none;cursor:pointer;font-size:16px;font-weight:bold;box-shadow:0 4px 8px rgba(212,196,168,0.3)">スキップして開始</button>
+          <button id="qrConfirmBtn" class="qr-button qr-button-primary">QR読み取り完了・開始</button>
+          <button id="qrSkipBtn" class="qr-button qr-button-secondary">スキップして開始</button>
         </div>
         <div style="margin-top:15px;font-size:12px;color:#8b7355">
           💡 Win11のカメラアプリでも読み取れます
@@ -118,113 +88,24 @@ function generateStampRallyHTML() {
 
     const el = id => document.getElementById(id);
 
-    // データをJavaScript内に直接埋め込み
-    const data = {
-      "appName": "京都おススメルートナビ",
-      "version": "1.0",
-      "locations": [
-        {
-          "id": "kinkakuji",
-          "name": "金閣寺（鹿苑寺）",
-          "coordinates": {
-            "lat": 35.0394,
-            "lng": 135.7299
-          },
-          "attributes": {
-            "crowd_level": "high",
-            "theme": "gorgeous",
-            "benefit": "圧倒的な美と富の象徴"
-          },
-          "image": "../static/pic/kinkakuzi.jpg",
-          "markdown_details": "## ✨ 金閣寺（鹿苑寺）\\n\\n**特徴：**\\n金箔で覆われた舎利殿はあまりにも有名。池に映る「逆さ金閣」は絶景です。室町幕府の三代将軍、足利義満が築いた北山文化の象GANTT。その輝きは、見る者の心を掴んで離しません。\\n\\n* **見どころ：** 舎利殿、鏡湖池、陸舟の松\\n* **得られる体験：** 華やかで豪華絢爛な美しさに圧倒される。強いエネルギーを感じる。\\n"
-        },
-        {
-          "id": "ginkakuji",
-          "name": "銀閣寺（慈照寺）",
-          "coordinates": {
-            "lat": 35.0269,
-            "lng": 135.7981
-          },
-          "attributes": {
-            "crowd_level": "medium",
-            "theme": "wabi_sabi",
-            "benefit": "静かな思索と心の平穏"
-          },
-          "image": "../static/pic/ginkakuzi.jpg",
-          "markdown_details": "## 🍃 銀閣寺（慈照寺）\\n\\n**特徴：**\\n金閣寺のような派手さはありませんが、わびさびの精神を体現した簡素で洗練された美しさが魅力です。銀沙灘や向月台といった美しい庭園を眺めながら、静かに自分と向き合う時間を持てます。\\n\\n* **見どころ：** 観音殿（銀閣）、東求堂、美しい庭園\\n* **得られる体験：** 落ち着いた雰囲気の中で心を静め、日本の美意識の奥深さに触れる。\\n"
-        },
-        {
-          "id": "kiyomizudera",
-          "name": "清水寺",
-          "coordinates": {
-            "lat": 34.9949,
-            "lng": 135.7850
-          },
-          "attributes": {
-            "crowd_level": "high",
-            "theme": "dynamic",
-            "benefit": "新たな一歩を踏み出す勇気"
-          },
-          "image": "../static/pic/kiyomizudera.jpg",
-          "markdown_details": "## ⛰️ 清水寺\\n\\n**特徴：**\\n「清水の舞台から飛び降りる」の語源となった舞台は圧巻の景色。音羽の滝や縁結びの地主神社など、見どころが多く活気に満ちています。京都市内を一望できる舞台からの眺めは、新しい挑戦への勇気を与えてくれるでしょう。\\n\\n* **見どころ：** 清水の舞台、音羽の滝、地主神社\\n* **得られる体験：** 雄大な景色を見て心をリフレッシュし、未来への活力を得る。\\n"
+    // データを外部JSONファイルから読み込み
+    let data = null;
+    
+    // JSONデータを読み込む関数
+    async function loadData() {
+      try {
+        const response = await fetch('../../static/json/sightseeing/sightseeing.json');
+        if (!response.ok) {
+          throw new Error('データの読み込みに失敗しました');
         }
-      ],
-      "userPreferences": {
-        "questions": [
-          {
-            "id": "crowd_preference",
-            "text": "人混みは気になりますか？",
-            "options": [
-              { "value": "not_concerned", "label": "気にならない" },
-              { "value": "concerned", "label": "気になる" }
-            ]
-          },
-          {
-            "id": "goal",
-            "text": "今のあなたは、どのような状態ですか？",
-            "options": [
-              { "value": "want_energy", "label": "とにかく元気や刺激が欲しい" },
-              { "value": "want_calm", "label": "心を落ち着けて静かに考えたい" }
-            ]
-          }
-        ]
-      },
-      "routes": [
-        {
-          "id": "route_01",
-          "title": "【王道ゴールデンルート】京都のパワーを全身で感じる旅",
-          "description": "京都を代表する3つの名所を巡り、そのエネルギーを最大限に浴びる王道コースです。",
-          "conditions": {
-            "crowd_preference": "not_concerned",
-            "goal": "want_energy"
-          },
-          "nodes": ["kinkakuji", "kiyomizudera", "ginkakuji"],
-          "markdown_summary": "### 提案ルート：王道ゴールデンルート\\n\\nエネルギッシュなあなたに最適な、京都のパワーを全身で感じる旅をご提案します。人混みを気にせず、人気スポットを巡りましょう！\\n\\n**巡る順番（ノード）：**\\n\\n1.  \`[金閣寺]\` -> 2. \`[清水寺]\` -> 3. \`[銀閣寺]\`\\n\\n最初に金閣寺の輝きで心を掴み、次に清水寺の活気と雄大な景色でエネルギーを充電。最後に銀閣寺の静けさで心を整える、メリハリのあるルートです."
-        },
-        {
-          "id": "route_02",
-          "title": "【静寂とわびさびルート】心を見つめ直す静かな時間",
-          "description": "人混みを避け、静かな雰囲気の中で自分と向き合う時間を大切にするコースです。",
-          "conditions": {
-            "crowd_preference": "concerned",
-            "goal": "want_calm"
-          },
-          "nodes": ["ginkakuji", "kinkakuji"],
-          "markdown_summary": "### 提案ルート：静寂とわびさびルート\\n\\n心を落ち着けたいあなたへ。人混みを避けつつ、京都の奥深い美に触れるルートをご提案します。\\n\\n**巡る順番（ノード）：**\\n\\n1.  \`[銀閣寺]\` -> 2. \`[金閣寺]\`\\n\\nまずは銀閣寺で、わびさびの世界に浸り心を静めます。静かな時間を過ごしたあと、最後に金閣寺の圧倒的な美しさに触れることで、新たな発見があるかもしれません。（※清水寺は特に混雑が激しいため、このルートでは除外しています）"
-        },
-        {
-          "id": "route_03",
-          "title": "【静と動のメリハリルート】内なる情熱と向き合う旅",
-          "description": "人混みは気になるけれど、力強いエネルギーも感じたい。そんなあなたに贈る、静けさと活気のバランスを重視したコースです。",
-          "conditions": {
-            "crowd_preference": "concerned",
-            "goal": "want_energy"
-          },
-          "nodes": ["ginkakuji", "kiyomizudera"],
-          "markdown_summary": "### 提案ルート：静と動のメリハリルート\\n\\nエネルギッシュな体験を求めつつも、人混みは避けたいあなたへ。静と動のバランスが取れたルートを提案します。\\n\\n**巡る順番（ノード）：**\\n\\n1.  \`[銀閣寺]\` -> 2. \`[清水寺]\`\\n\\nまず銀閣寺の静かな空間で心を集中させます。その後、少し活気のある清水寺へ向かい、舞台からの景色を眺めて未来へのエネルギーを感じましょう。（※金閣寺は特に団体観光客が多いため、このルートでは除外しています）"
-        }
-      ]
-    };
+        data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('データ読み込みエラー:', error);
+        showError('データの読み込みに失敗しました。ページを再読み込みしてください。');
+        return null;
+      }
+    }
 
     // スタンプラリーを開始
     function startStampRally() {
@@ -464,7 +345,8 @@ function generateStampRallyHTML() {
       return themeMap[theme] || theme;
     }
 
-    function onDataLoaded(){
+    // データ読み込み完了後の初期化
+    async function onDataLoaded(){
       el('stampUI').style.display='none';
       
       // モーダルコントロールを設定
@@ -472,11 +354,14 @@ function generateStampRallyHTML() {
       const stampCloseBtn = el('stampModalClose');
       stampCloseBtn.onclick = ()=> { stampModal.style.display='none'; el('stampModalContent').innerHTML=''; };
       
-      // スタンプラリーを開始
-      startStampRally();
+      // データを読み込んでからスタンプラリーを開始
+      const loadedData = await loadData();
+      if (loadedData) {
+        startStampRally();
+      }
     }
 
-    // データは既に読み込まれているので、即座に初期化
+    // ページ読み込み時にデータを読み込んで初期化
     onDataLoaded();
   </script>
   <!-- QRious for QR generation -->
@@ -535,12 +420,7 @@ function generateStampRallyHTML() {
       // スキャナー用のdivを作成
       const scannerDiv = document.createElement('div');
       scannerDiv.id = 'qrScanner';
-      scannerDiv.style.width = '220px';
-      scannerDiv.style.height = '220px';
-      scannerDiv.style.margin = '12px auto';
-      scannerDiv.style.border = '3px solid #d4c4a8';
-      scannerDiv.style.borderRadius = '12px';
-      scannerDiv.style.background = '#fff';
+      scannerDiv.className = 'qr-scanner';
       
       canvas.parentNode.insertBefore(scannerDiv, canvas.nextSibling);
       
@@ -605,7 +485,7 @@ function generateStampRallyHTML() {
       const scannerDiv = document.getElementById('qrScanner');
       if (scannerDiv) {
         scannerDiv.innerHTML = \`
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#8b4513;font-weight:bold;">
+          <div class="qr-scanner-status qr-scanner-success">
             <div style="font-size:48px;margin-bottom:10px">✅</div>
             <div>QRコード読み取り成功！</div>
             <div style="font-size:12px;margin-top:5px">スタンプラリーを開始します...</div>
@@ -619,7 +499,7 @@ function generateStampRallyHTML() {
       const scannerDiv = document.getElementById('qrScanner');
       if (scannerDiv) {
         scannerDiv.innerHTML = \`
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#d00;font-weight:bold;">
+          <div class="qr-scanner-status qr-scanner-error">
             <div style="font-size:48px;margin-bottom:10px">❌</div>
             <div>無効なQRコードです</div>
             <div style="font-size:12px;margin-top:5px">正しいQRコードを読み取ってください</div>
@@ -637,7 +517,7 @@ function generateStampRallyHTML() {
       const scannerDiv = document.getElementById('qrScanner');
       if (scannerDiv) {
         scannerDiv.innerHTML = \`
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#8b7355;font-weight:bold;">
+          <div class="qr-scanner-status qr-scanner-info">
             <div style="font-size:48px;margin-bottom:10px">📷</div>
             <div>カメラにアクセスできません</div>
             <div style="font-size:12px;margin-top:5px">Win11のカメラアプリをお試しください</div>
@@ -654,20 +534,7 @@ function generateStampRallyHTML() {
       const scanButton = document.createElement('button');
       scanButton.id = 'qrScanBtn';
       scanButton.textContent = '📷 カメラでQRを読み取る';
-      scanButton.style.cssText = \`
-        padding: 12px 24px;
-        border-radius: 25px;
-        background: #d4c4a8;
-        color: #8b4513;
-        border: none;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: bold;
-        box-shadow: 0 4px 8px rgba(212,196,168,0.3);
-        margin: 10px 5px;
-        display: block;
-        width: 100%;
-      \`;
+      scanButton.className = 'qr-button qr-button-scan';
       
       scanButton.onclick = startQRScanning;
       buttonContainer.appendChild(scanButton);
