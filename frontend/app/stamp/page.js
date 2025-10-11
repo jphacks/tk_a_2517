@@ -1,13 +1,60 @@
 // app/kyoto/page.js
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import styles from './stamp.module.css';
 import { marked } from 'marked';
 
+// ---------- 追加: API用の JSON フェッチ ----------
+async function fetchJSON(url, init) {
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, ...init });
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    const txt = await res.text();
+    throw new Error(`Non-JSON response (${res.status}): ${txt.slice(0, 120)}`);
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error(`API error: ${JSON.stringify(data)}`);
+  return data;
+}
+
+// ---------- 追加: numbers(list) → visited(Set<id>) 変換 ----------
+function numbersToVisited(numbers, locations) {
+  const set = new Set();
+  if (!Array.isArray(numbers) || !Array.isArray(locations)) return set;
+
+  numbers.forEach((n) => {
+    const s = String(n);
+    // 1) id 直接一致
+    const byId = locations.find((loc) => loc.id === s);
+    if (byId) return set.add(byId.id);
+    // 2) 0-based index
+    if (Number.isInteger(n) && n >= 0 && n < locations.length) return set.add(locations[n].id);
+    // 3) 1-based index
+    const idx = Number(n) - 1;
+    if (Number.isInteger(idx) && idx >= 0 && idx < locations.length) return set.add(locations[idx].id);
+
+    console.warn('[numbersToVisited] 無効な番号をスキップ:', n);
+  });
+  return set;
+}
+
+// app/stamp/page.js あるいは app/kyoto/page.js の先頭付近に追加
+const CROWD_MAP = { low: '少ない', medium: '普通', high: '多い' };
+const THEME_MAP = { gorgeous: '豪華絢爛', wabi_sabi: 'わびさび', dynamic: 'ダイナミック' };
+
+function getCrowdLevelText(level) {
+  return CROWD_MAP[level] ?? String(level ?? '');
+}
+
+function getThemeText(theme) {
+  return THEME_MAP[theme] ?? String(theme ?? '');
+}
+
+
 export default function KyotoStampRallyPage() {
   const [data, setData] = useState(null);
-  const [visited, setVisited] = useState(() => new Set()); // 訪問済みIDの集合
+  const [visited, setVisited] = useState(() => new Set()); // ← ここはAPI同期のみで更新
   const [showUI, setShowUI] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalLocation, setModalLocation] = useState(null);
@@ -22,9 +69,9 @@ export default function KyotoStampRallyPage() {
 
   async function loadSample() {
     try {
-      const d = await loadJsonFromUrl('/sightseeing.json');
+      const d = await loadJsonFromUrl('/json/sightseeing.json');
       setData(d);
-      setShowUI(false); // 一旦閉じてから開始
+      setShowUI(false);
       setError(null);
       startStampRally(d);
     } catch (e) {
@@ -32,11 +79,10 @@ export default function KyotoStampRallyPage() {
     }
   }
 
-  // file:// などで自動ロードが失敗する可能性があるので try
   useEffect(() => {
     (async () => {
       try {
-        const d = await loadJsonFromUrl('/sightseeing.json');
+        const d = await loadJsonFromUrl('/json/sightseeing.json');
         setData(d);
         startStampRally(d);
       } catch {
@@ -56,24 +102,39 @@ export default function KyotoStampRallyPage() {
     return data?.locations ? [...data.locations] : [];
   }, [data]);
 
-  // 進捗などのメトリクス
+  // ---------- 追加: サーバ履歴から visited を同期 ----------
+  const syncVisitedFromServer = useCallback(async () => {
+    if (!allLocations.length) return;
+    try {
+      const d = await fetchJSON('/api/query-numbers'); // { list: number[] }
+      const next = numbersToVisited(d.list ?? [], allLocations);
+      setVisited(next);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [allLocations]);
+
+  // data(=locations) が揃い UI 表示になったら同期
+  useEffect(() => {
+    if (showUI && allLocations.length) {
+      syncVisitedFromServer();
+    }
+  }, [showUI, allLocations.length, syncVisitedFromServer]);
+
+  // 進捗
   const collectedCount = visited.size;
   const totalCount = allLocations.length;
   const completionRate = totalCount > 0 ? Math.round((collectedCount / totalCount) * 100) : 0;
 
   // アイコン取得
   function getLocationIcon(loc) {
-    const iconMap = {
-      kinkakuji: '⛩️',
-      ginkakuji: '🏛️',
-      kiyomizudera: '🏔️',
-    };
+    const iconMap = { kinkakuji: '⛩️', ginkakuji: '🏛️', kiyomizudera: '🏔️' };
     return iconMap[loc.id] || '📍';
   }
 
-  // モーダルを開閉
+  // モーダル
   function openStampModal(location, isVisited) {
-    if (!isVisited) return;
+    if (!isVisited) return; // 未訪問は開かない
     setModalLocation(location);
     setModalOpen(true);
   }
@@ -82,56 +143,26 @@ export default function KyotoStampRallyPage() {
     setModalLocation(null);
   }
 
-  // スタンプ獲得時の通知アニメーション
-  function showStampGetAnimation(location) {
-    const div = document.createElement('div');
-    div.className = styles.notification;
-    div.innerHTML = `
-      <div class="${styles.notificationIcon}">${getLocationIcon(location)}</div>
-      <div>スタンプ獲得！</div>
-      <div class="${styles.notificationSmall}">${location.name}</div>
-    `;
-    document.body.appendChild(div);
-    setTimeout(() => {
-      div.remove();
-    }, 2000);
-  }
-
-  // テキスト化ヘルパ
-  function getCrowdLevelText(level) {
-    const levelMap = { low: '少ない', medium: '普通', high: '多い' };
-    return levelMap[level] || level;
-  }
-  function getThemeText(theme) {
-    const themeMap = { gorgeous: '豪華絢爛', wabi_sabi: 'わびさび', dynamic: 'ダイナミック' };
-    return themeMap[theme] || theme;
-  }
-
-  // スタンプのクリック
+  // ---------- 変更: クリックしても visited を更新しない ----------
   function onStampClick(location) {
     const isVisited = visited.has(location.id);
     if (isVisited) {
       openStampModal(location, true);
     } else {
-      // 新規に訪問として登録
-      setVisited(prev => {
-        const next = new Set(prev);
-        next.add(location.id);
-        return next;
-      });
-      showStampGetAnimation(location);
+      // クリックでは何もしない（状態変更しない）
+      // 必要なら軽いトースト表示など:
+      // alert('未訪問の観光地です（/visit によるチェックインが必要）');
     }
   }
 
   // プレースホルダークリック
   function onPlaceholderClick() {
-    setModalLocation({
-      id: 'placeholder',
-      name: '未実装の観光地',
-      placeholder: true,
-    });
+    setModalLocation({ id: 'placeholder', name: '未実装の観光地', placeholder: true });
     setModalOpen(true);
   }
+
+  // スタンプ獲得演出（今回は visited 変更しないため未使用だが残しておく）
+  function showStampGetAnimation(_location) { /* no-op or keep for future */ }
 
   // グリッドに表示する最大 6 件
   const locationsToShow = allLocations.slice(0, 6);
@@ -143,12 +174,6 @@ export default function KyotoStampRallyPage() {
         <h1>🏯 京都スタンプラリー</h1>
         <p>京都の名所を巡ってスタンプを集めよう！各観光地をクリックして詳細を確認できます。</p>
 
-        <div className={styles.controls}>
-          <button className={styles.primaryBtn} onClick={loadSample}>
-            スタンプラリー開始
-          </button>
-        </div>
-
         {error && <div className={styles.error}>{error}</div>}
 
         {showUI && (
@@ -157,10 +182,7 @@ export default function KyotoStampRallyPage() {
             <div className={styles.stampSubtitle}>観光地を巡ってスタンプを集めよう！</div>
 
             <div className={styles.progressBar}>
-              <div
-                className={styles.progressFill}
-                style={{ width: `${completionRate}%` }}
-              />
+              <div className={styles.progressFill} style={{ width: `${completionRate}%` }} />
             </div>
 
             <div className={styles.stats}>
@@ -213,12 +235,9 @@ export default function KyotoStampRallyPage() {
           </div>
         )}
 
-        <p className={styles.hint}>
-          💡 ヒント: スタンプをクリックして観光地の詳細を確認できます！
-        </p>
+        <p className={styles.hint}>💡 ヒント: スタンプをクリックして観光地の詳細を確認できます！</p>
       </div>
 
-      {/* モーダル */}
       {modalOpen && (
         <div className={styles.modal} onClick={closeStampModal} role="dialog" aria-modal="true">
           <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
@@ -230,9 +249,7 @@ export default function KyotoStampRallyPage() {
                     <div className={styles.modalIcon}>
                       {modalLocation ? getLocationIcon(modalLocation) : '📍'}
                     </div>
-                    <h3 className={styles.modalTitle}>
-                      {modalLocation?.name ?? ''}
-                    </h3>
+                    <h3 className={styles.modalTitle}>{modalLocation?.name ?? ''}</h3>
                   </div>
 
                   {modalLocation?.attributes && (
@@ -245,11 +262,7 @@ export default function KyotoStampRallyPage() {
 
                   {modalLocation?.image && (
                     <div className={styles.modalImageWrap}>
-                      <img
-                        src={modalLocation.image}
-                        alt={modalLocation.name}
-                        className={styles.modalImage}
-                      />
+                      <img src={modalLocation.image} alt={modalLocation.name} className={styles.modalImage} />
                     </div>
                   )}
 
@@ -269,9 +282,7 @@ export default function KyotoStampRallyPage() {
                     <div className={styles.modalIcon}>❓</div>
                     <h3 className={styles.modalTitle}>未実装の観光地</h3>
                   </div>
-                  <p className={styles.modalPlaceholderText}>
-                    今後追加予定の観光地です！
-                  </p>
+                  <p className={styles.modalPlaceholderText}>今後追加予定の観光地です！</p>
                 </>
               )}
             </div>
