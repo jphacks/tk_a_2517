@@ -1,12 +1,16 @@
 // 京都スタンプラリー - JavaScript版
-function generateStampRallyHTML() {
+export function generateStampRallyHTML() {
+  // ブラウザ環境でのみ実行
+  if (typeof window === 'undefined') {
+    return '<div>Loading...</div>';
+  }
   return `<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>京都スタンプラリー</title>
-  <link rel="stylesheet" href="../../static/css/sightseeing/sightseeing.css">
+  <link rel="stylesheet" href="./css/sightseeing/sightseeing.css">
 </head>
 <body>
   <div class="container">
@@ -94,14 +98,16 @@ function generateStampRallyHTML() {
     // JSONデータを読み込む関数
     async function loadData() {
       try {
-        const response = await fetch('../../static/json/sightseeing/sightseeing.json');
+        const response = await fetch('./json/sightseeing/sightseeing.json');
         if (!response.ok) {
           throw new Error('データの読み込みに失敗しました');
         }
         data = await response.json();
         return data;
       } catch (error) {
-        console.error('データ読み込みエラー:', error);
+        if (typeof console !== 'undefined') {
+          console.error('データ読み込みエラー:', error);
+        }
         showError('データの読み込みに失敗しました。ページを再読み込みしてください。');
         return null;
       }
@@ -259,10 +265,12 @@ function generateStampRallyHTML() {
       
       document.body.appendChild(notification);
       
-      setTimeout(() => {
-        document.body.removeChild(notification);
-        document.head.removeChild(style);
-      }, 2000);
+      if (typeof setTimeout !== 'undefined') {
+        setTimeout(() => {
+          document.body.removeChild(notification);
+          document.head.removeChild(style);
+        }, 2000);
+      }
     }
 
     // 観光地のアイコンを取得
@@ -378,7 +386,7 @@ function generateStampRallyHTML() {
       const canvas = document.getElementById('qrCanvas');
       
       // 現在のURLをQRコードとして生成
-      const currentUrl = window.location.href;
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : 'http://localhost:3000/sightseeing';
       const qr = new QRious({ 
         element: canvas, 
         value: currentUrl, 
@@ -437,7 +445,9 @@ function generateStampRallyHTML() {
           { facingMode: 'environment' },
           config,
           (decodedText, decodedResult) => {
-            console.log('QR Code detected:', decodedText);
+            if (typeof console !== 'undefined') {
+              console.log('QR Code detected:', decodedText);
+            }
             handleQRCodeDetected(decodedText);
           },
           (error) => {
@@ -445,14 +455,20 @@ function generateStampRallyHTML() {
           }
         ).then(() => {
           isScanning = true;
-          console.log('QR Scanner started');
+          if (typeof console !== 'undefined') {
+            console.log('QR Scanner started');
+          }
         }).catch((err) => {
-          console.error('QR Scanner start failed:', err);
+          if (typeof console !== 'undefined') {
+            console.error('QR Scanner start failed:', err);
+          }
           showQRScanError();
         });
         
       } catch (error) {
-        console.error('QR Scanner initialization failed:', error);
+        if (typeof console !== 'undefined') {
+          console.error('QR Scanner initialization failed:', error);
+        }
         showQRScanError();
       }
     }
@@ -462,14 +478,19 @@ function generateStampRallyHTML() {
       if (qrScanner && isScanning) {
         qrScanner.stop().then(() => {
           isScanning = false;
-          console.log('QR Scanner stopped');
+          if (typeof console !== 'undefined') {
+            console.log('QR Scanner stopped');
+          }
         }).catch((err) => {
-          console.error('Error stopping scanner:', err);
+          if (typeof console !== 'undefined') {
+            console.error('Error stopping scanner:', err);
+          }
         });
       }
       
       // 検出されたURLが現在のページと同じかチェック
-      if (decodedText === window.location.href || decodedText.includes('route_navigator')) {
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : 'http://localhost:3000/sightseeing';
+      if (decodedText === currentUrl || decodedText.includes('route_navigator')) {
         showQRSuccess();
         setTimeout(() => {
           el('qrIntroModal').style.display = 'none';
@@ -506,9 +527,11 @@ function generateStampRallyHTML() {
           </div>
         \`;
         
-        setTimeout(() => {
-          startQRScanning();
-        }, 2000);
+        if (typeof setTimeout !== 'undefined') {
+          setTimeout(() => {
+            startQRScanning();
+          }, 2000);
+        }
       }
     }
 
@@ -550,13 +573,16 @@ function generateStampRallyHTML() {
 </html>`;
 }
 
-// モジュールエクスポート（Node.js環境の場合）
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { generateStampRallyHTML };
-}
+// デフォルトエクスポート
+export default { generateStampRallyHTML };
 
 // クエリパラメータ処理
-function handleQueryParameters() {
+export function handleQueryParameters() {
+  // ブラウザ環境でのみ実行
+  if (typeof window === 'undefined') {
+    return { showQR: true, autoStart: false };
+  }
+  
   const urlParams = new URLSearchParams(window.location.search);
   const action = urlParams.get('action');
   
@@ -576,39 +602,4 @@ function handleQueryParameters() {
   }
 }
 
-// ブラウザ環境での使用例
-if (typeof window !== 'undefined') {
-  // ブラウザで直接実行された場合、HTMLを生成して表示
-  document.addEventListener('DOMContentLoaded', function() {
-    const htmlContent = generateStampRallyHTML();
-    document.open();
-    document.write(htmlContent);
-    document.close();
-    
-    // クエリパラメータに基づいて動作を制御
-    const params = handleQueryParameters();
-    
-    if (params.autoStart) {
-      // 直接スタンプラリーを開始
-      setTimeout(() => {
-        if (typeof startStampRally === 'function') {
-          startStampRally();
-        }
-      }, 1000);
-    } else if (params.showQR) {
-      // QRモーダルを表示
-      setTimeout(() => {
-        if (typeof showQrIntro === 'function') {
-          showQrIntro();
-        }
-        
-        if (params.autoScan && typeof startQRScanning === 'function') {
-          // 自動的にQRスキャンを開始
-          setTimeout(() => {
-            startQRScanning();
-          }, 2000);
-        }
-      }, 1000);
-    }
-  });
-}
+// ブラウザ環境での使用例（ESモジュールとして使用する場合は不要）

@@ -1,7 +1,21 @@
 # Dockerfile for Frontend
 FROM node:20
+
+# 開発環境用の設定
+ENV NODE_ENV=development
+ENV WATCHPACK_POLLING=true
+
 WORKDIR /app
-COPY ./frontend/package.json ./
+
+# package.jsonとpackage-lock.jsonをコピーして依存関係をインストール
+COPY ./frontend/package*.json ./
 RUN npm install
+
+# アプリケーションコードをコピー
 COPY ./frontend ./
+
+# ポート3000を公開
+EXPOSE 3000
+
+# 開発サーバーを起動
 CMD ["npm", "run", "dev"]
