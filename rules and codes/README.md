@@ -7,9 +7,11 @@
 
 ## プロジェクトのセットアップ手順
 ### Dockerを用いた環境構築
+
+#ルートディレクトリを想定する。
 (1)イメージのビルド
 ```bash
-docker build -t jphack_front:v1 -f Docker/Docker.frontend .
+docker build -t jphack_front:v1 -f Docker/Dockerfile.frontend .
 ```
 (2)コンテナに入る
 ```bash
