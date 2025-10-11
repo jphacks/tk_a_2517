@@ -1,0 +1,8 @@
+tasks:
+  - name: "Fetch Web (MCP)"
+    command: "curl -s 'http://localhost:3001/mcp/fetch?url=https://example.com&apiKey=devkey123'"
+    description: "Fetch web content via local MCP fetch endpoint"
+
+  - name: "Stepify (MCP)"
+    command: "curl -s -X POST 'http://localhost:3001/mcp/stepify' -H 'Content-Type: application/json' -d '{\"text\":\"写真を撮って、来場者を誘導して、忘れ物を処理する。\"}' -H 'x-api-key: devkey123'"
+    description: "Call local stepify to generate microtasks"

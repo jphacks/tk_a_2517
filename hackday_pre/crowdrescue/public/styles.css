@@ -1,0 +1,22 @@
+:root{--brand:#0b66ff;--bg:#f7fbff;--muted:#666}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;padding:18px;background:var(--bg);color:#111}
+.container{max-width:980px;margin:0 auto}
+.site-header h1{margin:0;font-size:20px}
+.site-header .subtitle{color:var(--muted);font-size:13px}
+.roomline{margin-top:12px;margin-bottom:8px}
+.controls{display:flex;gap:8px;align-items:center;margin-top:12px}
+.input-url{flex:1;padding:8px;border-radius:6px;border:1px solid #ddd}
+.btn{padding:8px 12px;background:var(--brand);color:#fff;border-radius:8px;border:none;cursor:pointer}
+.muted{color:var(--muted)}
+#list > div{background:#fff;padding:10px;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
+.toolbar{display:flex;gap:8px;align-items:center}
+#qr{width:200px;height:200px;border:1px solid #ddd;display:inline-block;border-radius:8px;background:#fff;padding:8px}
+.panel{display:flex;gap:12px;align-items:flex-start}
+.progress{width:160px;background:#eee;border-radius:6px;height:18px;overflow:hidden}
+.card{perspective:800px}
+.card-inner{transition:transform .6s;transform-style:preserve-3d}
+.card.flipped .card-inner{transform:rotateY(180deg)}
+.card-front,.card-back{backface-visibility:hidden;padding:8px;border:1px solid #eee;background:#fff;border-radius:8px}
+.card-back{position:absolute;left:0;top:0;transform:rotateY(180deg);background:#fff}
+
+@media (max-width:600px){ .controls{flex-direction:column;align-items:stretch} #qr{width:140px;height:140px} }

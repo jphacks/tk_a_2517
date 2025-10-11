@@ -1,0 +1,153 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CrowdRescue Participant</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%230b66ff'/%3E%3Ctext x='50'%20y='57' font-size='44' text-anchor='middle' fill='white' font-family='Arial'>CR</text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <h1>参加ページ</h1>
+      <div class="subtitle">CrowdRescue — 参加者ビュー</div>
+    </header>
+    <div class="roomline">Room: <b id="room">-</b></div>
+  <div id="list"></div>
+    <div class="controls">
+      <input id="scrapeUrl" placeholder="URLを入力してスクレイプ (例: https://example.com)" class="input-url" />
+      <button class="btn" id="scrapeBtn">スクレイプしてタスク化</button>
+      <div id="scrapeResult" class="muted" style="margin-top:8px;color:#444"></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="localStepify">ローカルAIでステップ化</button>
+      <span id="localStepifyStatus" class="muted" style="margin-left:8px;color:#666"></span>
+    </div>
+
+    <div class="controls">
+      <input id="note" placeholder="完了メモ" class="input-url" />
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const room = params.get('room');
+    document.getElementById('room').textContent = room || '-';
+    const socket = io();
+    socket.emit('join_room', { room });
+
+    socket.on('room_tasks', ({ room:r, tasks }) => { if (r!==room) return; render(tasks); });
+    socket.on('task_update', ({ room:r, tasks }) => { if (r!==room) return; render(tasks); });
+
+    // add flip styles
+    const pstyle = document.createElement('style');
+    pstyle.textContent = `
+      .card{perspective:800px}
+      .card-inner{transition:transform .6s;transform-style:preserve-3d}
+      .card.flipped .card-inner{transform:rotateY(180deg)}
+      .card-front,.card-back{backface-visibility:hidden;padding:8px;border:1px solid #eee;background:#fff}
+      .card-back{position:absolute;left:0;top:0;transform:rotateY(180deg);background:#fff}
+    `;
+    document.head.appendChild(pstyle);
+
+    function render(tasks){
+      const list = document.getElementById('list'); list.innerHTML = '';
+      tasks.forEach(t=>{
+        const el = document.createElement('div'); el.style.position='relative'; el.style.margin='8px 0';
+        el.dataset.front = `<div><b>${t.title}</b></div><div style="margin-top:8px">${t.description||''}</div>`;
+        el.innerHTML = el.dataset.front;
+        if (t.status === 'done'){
+          el.classList.add('card');
+          el.innerHTML = `<div class="card-inner"><div class="card-front">${el.dataset.front}</div><div class="card-back"><b>学びカード</b><div>${t.note||'学びを記入してください'}</div></div></div>`;
+          el.classList.add('flipped');
+        } else {
+          el.innerHTML += `<div style="margin-top:8px"><button class=\"btn\" onclick=\"claim('${t.id}')\">受領</button> <button class=\"btn\" onclick=\"complete('${t.id}')\">完了</button></div>`;
+        }
+        list.appendChild(el);
+      });
+    }
+
+    function claim(id){ socket.emit('claim_task', { room, id }); }
+    function complete(id){ const note = document.getElementById('note').value; socket.emit('complete_task', { room, id, note }); }
+
+    // scrape button handler
+    document.getElementById('scrapeBtn').addEventListener('click', async ()=>{
+      const url = document.getElementById('scrapeUrl').value.trim();
+      if (!url){ document.getElementById('scrapeResult').textContent = 'URLを入力してください'; return; }
+      document.getElementById('scrapeResult').textContent = 'スクレイプ中...';
+      try{
+        const resp = await fetch('/scrape', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ url, room }) });
+        const data = await resp.json();
+        if (!resp.ok){ document.getElementById('scrapeResult').textContent = 'エラー: ' + (data && data.error || resp.status); return; }
+        document.getElementById('scrapeResult').textContent = `タスク ${data.tasks.length} 件を追加しました`;
+        // tasks will be pushed by socket.io; but render fallback
+        if (data.tasks && data.tasks.length) {
+          // append then re-render
+          const current = document.querySelectorAll('#list > div');
+          // request server to emit current tasks by re-joining
+          socket.emit('join_room', { room });
+        }
+      }catch(e){ document.getElementById('scrapeResult').textContent = 'スクレイプ失敗: '+e.message }
+    });
+
+    // Local worker for Transformers.js (optional) - initialize
+    let stepWorker = null;
+    try{
+      stepWorker = new Worker('/worker_transformers.mjs', { type: 'module' });
+      stepWorker.postMessage({ type:'init' });
+      stepWorker.addEventListener('message', (e)=>{
+        const d = e.data || {};
+        if (d.type === 'status'){
+          document.getElementById('localStepifyStatus').textContent = d.status;
+        }
+        if (d.type === 'result' && d.tasks){
+              // Before sending tasks to server, do a simple client-side PII scan and ask user confirmation
+              const tasks = d.tasks || [];
+              const joined = tasks.map(t=>t.description||t.title||'').join('\n---\n');
+              // simple PII regex on client
+              const hasPII = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?\d[\d\-\s()]{6,}\d|〒?\d{3}-?\d{4}/ig.test(joined);
+              if (hasPII){
+                if (!confirm('検出されたテキストに個人情報（メール・電話・郵便番号）が含まれている可能性があります。送信してよいですか？')){
+                  document.getElementById('localStepifyStatus').textContent = '送信をキャンセルしました（PII）';
+                  return;
+                }
+              }
+              // send tasks to server to append to room
+              socket.emit('add_tasks', { room, tasks: d.tasks });
+              document.getElementById('localStepifyStatus').textContent = `追加: ${d.tasks.length} 件`;
+        }
+      });
+    }catch(e){ console.warn('worker not supported', e); document.getElementById('localStepifyStatus').textContent='worker unsupported'; }
+
+    document.getElementById('localStepify').addEventListener('click', async ()=>{
+      // take current scraped snippet if available, otherwise try to fetch current page
+      const snippet = (document.getElementById('scrapeResult') && document.getElementById('scrapeResult').dataset && document.getElementById('scrapeResult').dataset.snippet) || '';
+      let text = snippet;
+      if (!text){
+        // ask server to fetch current URL if present
+        const url = document.getElementById('scrapeUrl').value.trim();
+        if (url){
+          document.getElementById('localStepifyStatus').textContent = 'ページ取得中...';
+          try{
+            const resp = await fetch('/scrape', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ url }) });
+            const data = await resp.json();
+            text = (data && (data.snippet || (data.tasks && data.tasks.map(t=>t.description).join('\n')))) || '';
+            document.getElementById('scrapeResult').textContent = `タスク ${data.tasks ? data.tasks.length : 0} 件を取得`;
+            document.getElementById('scrapeResult').dataset.snippet = text;
+          }catch(e){ document.getElementById('localStepifyStatus').textContent = '取得失敗: '+e.message; return; }
+        } else {
+          document.getElementById('localStepifyStatus').textContent = 'URLを入力してください';
+          return;
+        }
+      }
+      if (stepWorker){
+        document.getElementById('localStepifyStatus').textContent = 'ローカル処理中...';
+        stepWorker.postMessage({ type:'stepify', text, maxTasks:3 });
+      }
+    });
+  </script>
+</body>
+</html>

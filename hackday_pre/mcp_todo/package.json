@@ -1,0 +1,16 @@
+{
+  "name": "mcp_todo",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node main.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "hono": "^4.7.7",
+    "@hono/node-server": "^1.14.1",
+    "hono-mcp-server-sse-transport": "^0.0.6",
+    "zod": "^3.24.3",
+    "node-fetch": "^3.3.2"
+  }
+}

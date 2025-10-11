@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  mcp:
+    build: .
+    ports:
+      - "3002:3001"
+    environment:
+      - MCP_API_KEY=devkey123
+    restart: unless-stopped

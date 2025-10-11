@@ -1,0 +1,26 @@
+[
+  {
+    "id": "tpl1",
+    "name": "備品確認テンプレ",
+    "tasks": [
+      { "title": "飲料のストックを確認する", "description": "会場の飲料在庫を確認し、残数を報告する", "status": "open" },
+      { "title": "消耗品を数える", "description": "ペン・紙・テープの残数を数えて報告する", "status": "open" },
+      { "title": "忘れ物カウンターを確認", "description": "落し物の有無と保管場所を確認する", "status": "open" }
+    ]
+  },
+  {
+    "id": "tpl2",
+    "name": "会場誘導テンプレ",
+    "tasks": [
+      { "title": "入口で誘導サインを設置", "description": "来場者の流れを作るサインを設置する", "status": "open" },
+      { "title": "通行経路を確認", "description": "経路上の障害物がないか確認する", "status": "open" }
+    ]
+  }
+  ,{
+    "id": "tpl_scrape",
+    "name": "スクレイプからタスク作成",
+    "tasks": [
+      { "title": "スクレイプ: URL を入力", "description": "参加者は URL を入力してページを解析し、タスク候補を自動で生成します", "status": "open" }
+    ]
+  }
+]

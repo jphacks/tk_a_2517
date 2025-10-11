@@ -1,0 +1,48 @@
+version: '3.8'
+services:
+  crowdrescue:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.crowdrescue
+    container_name: crowdrescue
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+
+  mcp_todo:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mcp
+    container_name: mcp_todo
+    ports:
+      - "3001:3001"
+    depends_on:
+      - crowdrescue
+
+  vercel_client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.vercel_client
+    container_name: vercel_client
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Mock envs for local testing - replace with real keys in production or Vercel env
+      - OPENAI_API_KEY=MOCK_OPENAI_KEY
+      - HUGGINGFACE_API_TOKEN=MOCK_HF_TOKEN
+      - FORCE_MOCK=true
+    depends_on:
+      - mcp_todo
+  vercel_cli:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.vercel_cli
+    container_name: vercel_cli
+    volumes:
+      - ../vercel_client:/work:rw
+    environment:
+      - VERCEL_TOKEN=${VERCEL_TOKEN}
+    tty: true
+    command: tail -f /dev/null

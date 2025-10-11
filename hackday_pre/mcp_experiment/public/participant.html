@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Participant</title>
+  <!-- small data-uri favicon to avoid 404s -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext x='0' y='13' font-size='13'%3EP%3C/text%3E%3C/svg%3E">
+  <style>
+    body{font-family:sans-serif;padding:20px}
+    .task{padding:12px;border:1px solid #eee;margin:8px 0}
+    .btn{padding:8px 10px;border-radius:6px;border:none;background:#0b66ff;color:white;cursor:pointer}
+  </style>
+</head>
+<body>
+  <h1>参加ページ</h1>
+  <div>Room: <b id="room"></b></div>
+  <div style="margin-top:12px">
+    <label>写真で入力（カメラ可）: <input type="file" id="photo" accept="image/*" capture="environment"></label>
+    <button id="ocrBtn" class="btn">OCR→送信</button>
+  </div>
+  <div id="list"></div>
+  <canvas id="card" width="400" height="200" style="display:none;border:1px solid #ddd;margin-top:12px"></canvas>
+
+  <!-- dynamic socket.io loader: try same-origin, then host:3002, then CDN -->
+  <script>
+    (function(){
+      var tried = 0;
+      function tryLoad(srcs){
+        if (tried >= srcs.length) return console.error('socket.io client unavailable');
+        var s = document.createElement('script');
+        s.src = srcs[tried++];
+        s.onload = function(){ console.log('socket.io loaded from', s.src); initSocket(); };
+        s.onerror = function(){ tryLoad(srcs); };
+        document.head.appendChild(s);
+      }
+      var same = location.origin + '/socket.io/socket.io.js';
+      var cdn = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
+      tryLoad([same, cdn]);
+
+      function initSocket(){
+        if (typeof io === 'undefined') return console.error('io not provided');
+        // try connecting to candidate backend ports
+        const host = location.hostname;
+        const proto = location.protocol;
+        const ports = [];
+        if (location.port) ports.push(location.port);
+        ['3002','3001','3000'].forEach(p=>{ if (!ports.includes(p)) ports.push(p); });
+        (async function tryConns(){
+          for (const p of ports){
+            const url = proto + '//' + host + (p ? ':'+p : '');
+            try {
+              const s = io(url, { transports:['polling','websocket'], timeout:2000 });
+              await new Promise((resolve,reject)=>{
+                const onConnect = () => { s.off('connect_error', onError); resolve(); };
+                const onError = (err) => { s.off('connect', onConnect); reject(err); };
+                s.once('connect', onConnect);
+                s.once('connect_error', onError);
+              });
+              window.__participant_socket = s;
+              console.log('participant socket connected to', url);
+              return;
+            } catch(e){ console.warn('participant connect failed', url, e && e.message); }
+          }
+          console.error('participant: could not connect to socket backend');
+        })();
+      }
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+  <script>
+    // queued emit helper for participant
+    let psocket = null;
+    const pqueue = [];
+    function pEmit(ev, payload){
+      if (psocket && psocket.emit) return psocket.emit(ev, payload);
+      pqueue.push({ev, payload});
+    }
+    function pFlush(){
+      while(pqueue.length && psocket && psocket.emit){
+        const it = pqueue.shift(); psocket.emit(it.ev, it.payload);
+      }
+    }
+    // watch for socket
+    (function watch(){
+      if (window.__participant_socket){ psocket = window.__participant_socket; setTimeout(pFlush,0); return; }
+      setTimeout(watch, 200);
+    })();
+
+    const params = new URLSearchParams(location.search);
+    const room = params.get('room');
+    document.getElementById('room').textContent = room || '-';
+    pEmit('room:join', { room });
+
+    // register handlers when participant socket is ready
+    function registerHandlers(s){
+      if (!s) return;
+      s.on('room:tasks', ({ room: r, tasks }) => { if (r !== room) return; render(tasks); });
+      s.on('task:update', ({ room: r, tasks }) => { if (r !== room) return; render(tasks); });
+    }
+    (function watchHandlers(){
+      if (window.__participant_socket){ registerHandlers(window.__participant_socket); return; }
+      setTimeout(watchHandlers, 200);
+    })();
+
+    function render(tasks){
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      tasks.forEach(t => {
+        const el = document.createElement('div');
+        el.className = 'task';
+        el.innerHTML = `<div><b>${t.title}</b></div>` +
+          `<div style="margin-top:8px"><button class=\"btn\" onclick=\"claim('${t.id}')\">受領</button> <button class=\"btn\" onclick=\"complete('${t.id}')\">完了</button></div>`;
+        list.appendChild(el);
+      });
+    }
+
+    function claim(id){ pEmit('task:claim', { room, id }); }
+    function complete(id){ pEmit('task:complete', { room, id }); }
+
+    // OCR flow
+    document.getElementById('ocrBtn').onclick = async () => {
+      const f = document.getElementById('photo').files[0];
+      if (!f) return alert('写真を選択してください');
+      const imgData = await readFileAsDataURL(f);
+      // load tesseract via CDN
+      const worker = Tesseract.createWorker({ logger: m => console.log(m) });
+      await worker.load();
+      await worker.loadLanguage('jpn+eng');
+      await worker.initialize('jpn+eng');
+      const { data: { text } } = await worker.recognize(imgData);
+      await worker.terminate();
+  // emit OCR text
+  pEmit('submit_ocr', { room, text });
+      alert('OCR送信しました:\n' + text.slice(0,200));
+    };
+
+    function readFileAsDataURL(file){
+      return new Promise((resolve,reject)=>{
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+
+    // generate learning card on task update when a task becomes done
+    // learning card generation on task update
+    (function watchForDone(){
+      if (window.__participant_socket){
+        window.__participant_socket.on('task:update', ({ room: r, tasks }) => {
+          if (r !== room) return;
+          const done = tasks.find(t => t.status === 'done');
+          if (done) drawCard(done.title);
+        });
+        return;
+      }
+      setTimeout(watchForDone, 200);
+    })();
+
+    function drawCard(text){
+      const c = document.getElementById('card');
+      c.style.display = 'block';
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height);
+      ctx.fillStyle = '#0b66ff'; ctx.font = '20px sans-serif'; ctx.fillText('学びカード', 16, 36);
+      ctx.fillStyle = '#000'; ctx.font = '16px sans-serif';
+      wrapText(ctx, text, 16, 70, 360, 20);
+      // download link
+      const a = document.createElement('a');
+      a.href = c.toDataURL('image/png');
+      a.download = 'learning_card.png';
+      a.textContent = '学びカードをダウンロード';
+      document.body.appendChild(a);
+    }
+
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+      const words = text.split(' ');
+      let line = '';
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        const testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+          ctx.fillText(line, x, y);
+          line = words[n] + ' ';
+          y += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, x, y);
+    }
+  </script>
+</body>
+</html>

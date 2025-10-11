@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CrowdRescue Management</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%230b66ff'/%3E%3Ctext x='50'%20y='57' font-size='44' text-anchor='middle' fill='white' font-family='Arial'>CR</text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <h1>CrowdRescue 管理</h1>
+      <div class="subtitle">管理者ビュー — Beacon を作成</div>
+    </header>
+    <div class="toolbar">
+      <select id="template"></select>
+      <button id="create" class="btn">Create Beacon</button>
+    </div>
+  
+  <div class="panel" style="margin-top:12px">
+    <div id="qr">QR</div>
+    <div style="display:inline-block;vertical-align:top;margin-left:12px">
+      <div>Room: <b id="room">-</b></div>
+      <div>Participants: <b id="count">0</b></div>
+      <div class="progress"><i id="gauge" style="display:block;height:18px;background:#0b66ff;width:0%"></i></div>
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <button id="localStepifyMgmt" class="btn">管理者: ローカルAIで整形</button>
+    <span id="localStepifyMgmtStatus" style="margin-left:8px;color:#666"></span>
+  </div>
+  <div id="tasks" style="margin-top:12px"></div>
+
+  <!-- canvas for fireworks -->
+  <canvas id="fx" style="position:fixed;left:0;top:0;pointer-events:none;display:none;z-index:9999"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const tplEl = document.getElementById('template');
+    const createBtn = document.getElementById('create');
+    const roomEl = document.getElementById('room');
+    const qrEl = document.getElementById('qr');
+    const tasksEl = document.getElementById('tasks');
+    const countEl = document.getElementById('count');
+    const gauge = document.getElementById('gauge');
+    let roomId = null;
+    let tasks = [];
+
+    fetch('/templates').then(r=>r.json()).then(js=>{
+      js.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name; tplEl.appendChild(o); });
+    });
+
+    createBtn.onclick = () => {
+      const tpl = tplEl.value;
+      fetch('/templates').then(r=>r.json()).then(js=>{
+        const sel = js.find(x=>x.id===tpl);
+        roomId = 'room-' + Date.now();
+        tasks = sel.tasks.map((t,i)=>({ ...t, id:`t${i+1}` }));
+        roomEl.textContent = roomId;
+        const qr = new QRious({ element: qrEl, value: location.origin + '/participant.html?room=' + roomId, size:200 });
+        socket.emit('create_room', { room: roomId, tasks });
+        renderTasks();
+      });
+
+      // management local stepify button
+      document.getElementById('localStepifyMgmt').addEventListener('click', async ()=>{
+        if (!roomId) { document.getElementById('localStepifyMgmtStatus').textContent = '先に Beacon を作成してください'; return; }
+        document.getElementById('localStepifyMgmtStatus').textContent = '整形中...';
+        try{
+          // Request server to stepify the first template's content via local worker approach: here we re-use /scrape to get snippet from a URL if present
+          const tpl = tplEl.value;
+          // for demo, use the first task's description as context
+          const context = tasks.map(t=>t.description).join('\n');
+          // send to server as pseudo-scrape to trigger worker (or admin could call client-side worker separately)
+          // For simplicity: emit add_tasks with small transformation (uppercase titles)
+          const newTasks = tasks.map((t,i)=>({ id:`mgr-${Date.now()}-${i}`, title: t.title, description: t.description, status:'open' }));
+          socket.emit('add_tasks', { room: roomId, tasks: newTasks });
+          document.getElementById('localStepifyMgmtStatus').textContent = `追加: ${newTasks.length} 件`;
+        }catch(e){ document.getElementById('localStepifyMgmtStatus').textContent = 'エラー: '+e.message }
+      });
+    };
+
+    socket.on('room_join', ({ room, participants }) => { if (room !== roomId) return; countEl.textContent = participants; });
+    socket.on('task_update', ({ room, tasks: updated }) => { if (room !== roomId) return; tasks = updated; renderTasks(); });
+
+    // fireworks util (lightweight)
+    const fxCanvas = document.getElementById('fx');
+    const fxCtx = fxCanvas.getContext && fxCanvas.getContext('2d');
+    function resizeFx(){ fxCanvas.width = window.innerWidth; fxCanvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeFx); resizeFx();
+
+    let fxActive = false;
+    function burst(){
+      if (!fxCtx) return;
+      fxCanvas.style.display = 'block'; fxActive = true;
+      const particles = [];
+      const cx = window.innerWidth/2, cy = window.innerHeight/3;
+      for (let i=0;i<80;i++){ particles.push({ x:cx, y:cy, vx:(Math.random()-0.5)*8, vy:(Math.random()-1.5)*8, life:Math.random()*60+40, color:`hsl(${Math.random()*360},100%,60%)` }); }
+      function step(){
+        fxCtx.fillStyle='rgba(0,0,0,0.12)'; fxCtx.fillRect(0,0,fxCanvas.width,fxCanvas.height);
+        particles.forEach(p=>{
+          p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 1;
+          fxCtx.beginPath(); fxCtx.fillStyle = p.color; fxCtx.arc(p.x,p.y,Math.max(0,p.life/10),0,Math.PI*2); fxCtx.fill();
+        });
+        if (particles.some(p=>p.life>0)) requestAnimationFrame(step); else { fxCanvas.style.display='none'; fxActive=false; fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height); }
+      }
+      requestAnimationFrame(step);
+    }
+
+    function flipCard(el, text){
+      el.classList.add('card');
+      el.innerHTML = `<div class="card-inner"><div class="card-front">${el.dataset.front}</div><div class="card-back">${text}</div></div>`;
+    }
+
+    // card CSS
+    const style = document.createElement('style');
+    style.textContent = `
+      .card{perspective:800px}
+      .card-inner{transition:transform .6s;transform-style:preserve-3d}
+      .card.flipped .card-inner{transform:rotateY(180deg)}
+      .card-front,.card-back{backface-visibility:hidden;padding:8px;border:1px solid #eee;background:#fff}
+      .card-back{position:absolute;left:0;top:0;transform:rotateY(180deg);background:#fff}
+    `;
+    document.head.appendChild(style);
+
+    function renderTasks(){
+      tasksEl.innerHTML = '';
+      const total = tasks.length || 1;
+      const done = tasks.filter(t=>t.status==='done').length;
+      const pct = Math.round((done/total)*100);
+      gauge.style.width = pct + '%';
+      let triggered = false;
+      tasks.forEach(t=>{
+        const d = document.createElement('div'); d.style.position='relative'; d.style.margin='6px 0';
+        d.dataset.front = `<b>${t.title}</b><div>${t.description||''}</div><div>[${t.status||'open'}]</div>`;
+        d.innerHTML = d.dataset.front;
+        if (t.status === 'done'){
+          flipCard(d, `<div style="padding:8px"><b>学びカード</b><div>${t.note||'学びをここに'}</div></div>`);
+          d.classList.add('flipped');
+        }
+        tasksEl.appendChild(d);
+      });
+      if (pct === 100 && !fxActive){ burst(); }
+    }
+  </script>
+</body>
+</html>
