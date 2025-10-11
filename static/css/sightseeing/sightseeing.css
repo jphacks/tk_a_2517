@@ -1,0 +1,284 @@
+/* 京都スタンプラリー - メインスタイル */
+body {
+  font-family: system-ui, -apple-system, "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "メイリオ", Meiryo, sans-serif;
+  padding: 20px;
+  background: #f5f1e8;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #faf8f3;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  border: 2px solid #e8dcc6;
+}
+
+/* スタンプUI用スタイル */
+.stamp-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 30px 0;
+  background: #f5f1e8;
+  padding: 25px;
+  border-radius: 15px;
+  border: 3px solid #d4c4a8;
+}
+
+.stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.stamp-slot {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 4px solid #d4c4a8;
+  position: relative;
+}
+
+.stamp-slot.visited {
+  background: #d4c4a8;
+  border-color: #8b4513;
+  color: #8b4513;
+  box-shadow: 0 8px 16px rgba(139,69,19,0.3);
+  animation: pulse 2s infinite;
+}
+
+.stamp-slot.placeholder {
+  background: #e8dcc6;
+  border-color: #c4b5a0;
+  color: #8b7355;
+}
+
+.stamp-slot:hover {
+  transform: scale(1.15);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+}
+
+.stamp-icon {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.stamp-text {
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.2;
+  font-weight: bold;
+}
+
+.stamp-title {
+  font-size: 28px;
+  font-weight: bold;
+  color: #8b4513;
+  margin-bottom: 12px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.stamp-subtitle {
+  font-size: 16px;
+  color: #8b7355;
+  margin-bottom: 24px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e8dcc6;
+  border-radius: 4px;
+  margin: 20px 0;
+  overflow: hidden;
+  border: 2px solid #d4c4a8;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b4513, #a0522d);
+  transition: width 0.5s ease;
+  border-radius: 4px;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+  padding: 15px;
+  background: #f5f1e8;
+  border-radius: 12px;
+  border: 2px solid #d4c4a8;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: bold;
+  color: #8b4513;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #8b7355;
+  margin-top: 4px;
+}
+
+/* アニメーション */
+@keyframes pulse {
+  0% { box-shadow: 0 8px 16px rgba(139,69,19,0.3); }
+  50% { box-shadow: 0 8px 16px rgba(139,69,19,0.6); }
+  100% { box-shadow: 0 8px 16px rgba(139,69,19,0.3); }
+}
+
+@keyframes stampGet {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  80% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+/* ユーティリティクラス */
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #8b7355;
+}
+
+.error {
+  background: #ffe6e6;
+  color: #d00;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+/* モーダルスタイル */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal-content {
+  position: relative;
+  max-width: 600px;
+  max-height: 80vh;
+  background: #faf8f3;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  border: 3px solid #8b4513;
+}
+
+.modal-close {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  border: none;
+  background: #8b4513;
+  color: #f5f1e8;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 20px;
+  box-shadow: 0 4px 8px rgba(139,69,19,0.3);
+}
+
+/* QRモーダル専用スタイル */
+.qr-modal {
+  z-index: 10002;
+}
+
+.qr-modal-content {
+  max-width: 520px;
+  text-align: center;
+}
+
+.qr-canvas {
+  border: 3px solid #d4c4a8;
+  margin: 12px auto;
+  display: block;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.qr-button {
+  padding: 12px 24px;
+  border-radius: 25px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  margin: 10px 5px;
+  box-shadow: 0 4px 8px rgba(139,69,19,0.3);
+}
+
+.qr-button-primary {
+  background: #8b4513;
+  color: #f5f1e8;
+}
+
+.qr-button-secondary {
+  background: #d4c4a8;
+  color: #8b4513;
+  box-shadow: 0 4px 8px rgba(212,196,168,0.3);
+}
+
+.qr-button-scan {
+  background: #d4c4a8;
+  color: #8b4513;
+  box-shadow: 0 4px 8px rgba(212,196,168,0.3);
+  display: block;
+  width: 100%;
+}
+
+/* QRスキャナー用スタイル */
+.qr-scanner {
+  width: 220px;
+  height: 220px;
+  margin: 12px auto;
+  border: 3px solid #d4c4a8;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.qr-scanner-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-weight: bold;
+}
+
+.qr-scanner-success {
+  color: #8b4513;
+}
+
+.qr-scanner-error {
+  color: #d00;
+}
+
+.qr-scanner-info {
+  color: #8b7355;
+}
