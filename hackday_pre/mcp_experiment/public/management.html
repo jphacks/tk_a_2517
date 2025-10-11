@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MCP Beacon Management</title>
+  <!-- small data-uri favicon to avoid 404s -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext x='0' y='13' font-size='13'%3EM%3C/text%3E%3C/svg%3E">
+  <style>
+    body{font-family:sans-serif;padding:20px}
+    #qr{width:220px;height:220px;border:1px solid #ddd;display:inline-block}
+    .tasks{margin-top:16px}
+    .task{padding:8px;border:1px solid #eee;margin:6px 0}
+    .progress{height:18px;background:#eee;border-radius:8px;overflow:hidden}
+    .progress > i{display:block;height:100%;background:#0b66ff;width:0%}
+  </style>
+</head>
+<body>
+  <h1>Beacon 管理</h1>
+  <p>
+    <button id="create">Create Beacon</button>
+  </p>
+  <div>
+    <canvas id="qr" width="220" height="220" style="display:inline-block;vertical-align:top;border:1px solid #ddd">Your browser does not support canvas</canvas>
+    <div style="display:inline-block;vertical-align:top;margin-left:12px">
+      <div>Room: <b id="roomId">-</b></div>
+      <div>Backend: <b id="backendStatus">detecting...</b></div>
+      <div>Participants: <b id="count">0</b></div>
+      <div class="progress"><i id="gauge"></i></div>
+    </div>
+  </div>
+  <div class="tasks" id="tasks"></div>
+  <hr />
+  <h3>MCP Test</h3>
+  <div>
+    <input id="testUrl" value="https://example.com" style="width:60%" />
+    <button id="testFetch" class="btn">Test Fetch</button>
+  </div>
+  <div style="margin-top:8px">
+    <textarea id="fetchOut" style="width:100%;height:120px"></textarea>
+    <div id="fetchErr" style="color:#b00;margin-top:6px"></div>
+  </div>
+  <div style="margin-top:8px">
+    <button id="testStepify" class="btn">Test Stepify (sample text)</button>
+    <textarea id="stepOut" style="width:100%;height:120px;margin-top:8px"></textarea>
+    <div id="stepErr" style="color:#b00;margin-top:6px"></div>
+  </div>
+
+  <!-- load socket.io client from the same origin; browsers will serve it at /socket.io/socket.io.js when socket.io server is attached -->
+  <script>
+    (function(){
+      var s = document.createElement('script');
+      s.src = location.origin + '/socket.io/socket.io.js';
+      s.onload = function(){
+        console.log('socket.io client loaded');
+        initSocket();
+      };
+      s.onerror = function(){
+        console.warn('socket.io client failed to load from', s.src);
+        // fallback to public CDN (last resort)
+        var s2 = document.createElement('script');
+        s2.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
+        s2.onload = function(){ console.log('socket.io loaded from CDN'); initSocket(); };
+        s2.onerror = function(){ console.error('socket.io client unavailable'); };
+        document.head.appendChild(s2);
+      };
+      document.head.appendChild(s);
+
+      // Try to connect to the backend socket server on multiple candidate URLs.
+      function initSocket(){
+        if (typeof io === 'undefined') {
+          console.error('io is not defined after loading socket.io client');
+          return;
+        }
+        const host = location.hostname;
+        const proto = location.protocol;
+        const portCandidates = [];
+        if (location.port) portCandidates.push(location.port);
+        // try demo-friendly backend ports
+        ['3002','3001','3000'].forEach(p => { if (!portCandidates.includes(p)) portCandidates.push(p); });
+
+        let connected = false;
+        // prefer known backend ports (demo mapping) first, then current page port
+        const ordered = [];
+        ['3002','3001','3000'].forEach(p => ordered.push(p));
+        if (location.port && !ordered.includes(location.port)) ordered.push(location.port);
+
+        (async function tryConnectList(){
+          for (const p of ordered){
+            const url = proto + '//' + host + (p ? ':' + p : '');
+            let s = null;
+            try {
+              s = io(url, { transports: ['polling','websocket'], timeout: 2000 });
+              await new Promise((resolve, reject) => {
+                const onConnect = () => { s.off('connect_error', onError); resolve('ok'); };
+                const onError = (err) => { s.off('connect', onConnect); reject(err); };
+                s.once('connect', onConnect);
+                s.once('connect_error', onError);
+              });
+              // success
+              window.__socket = s;
+              window.io = window.io || s;
+              window.__detectedBackend = url;
+              try { document.getElementById('backendStatus').textContent = url; } catch(_){}
+              console.log('socket.io connected to', url);
+              connected = true;
+              break;
+            } catch (e) {
+              try { s && s.close && s.close(); } catch(_){}
+              console.warn('socket connect failed to', url, e && e.message);
+            }
+          }
+          if (!connected) console.error('Could not connect to socket.io server on candidate ports');
+        })();
+      }
+    })();
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+  <script>
+    // use window.__socket as the socket instance (initialized by loader)
+    // socket may initialize asynchronously; provide a queued emit helper
+    let socket = null;
+    const emitQueue = [];
+    function queuedEmit(event, payload){
+      if (socket && socket.emit) return socket.emit(event, payload);
+      emitQueue.push({ event, payload });
+    }
+    function flushQueue(){
+      while(emitQueue.length && socket && socket.emit){
+        const it = emitQueue.shift();
+        socket.emit(it.event, it.payload);
+      }
+    }
+
+    // when socket loads it will attach to window.__socket
+    Object.defineProperty(window, '__socket', {
+      configurable: true,
+      set(v){
+        socket = v;
+        // also keep global io backward-compat if necessary
+        try{ window.io = window.io || v; }catch(e){}
+        setTimeout(flushQueue, 0);
+      },
+      get(){ return socket; }
+    });
+
+    const createBtn = document.getElementById('create');
+    const roomEl = document.getElementById('roomId');
+    const qrEl = document.getElementById('qr');
+    const tasksEl = document.getElementById('tasks');
+    const countEl = document.getElementById('count');
+    const gauge = document.getElementById('gauge');
+    let roomId = null;
+    let tasks = [];
+
+    createBtn.onclick = async () => {
+      // create a room id and tasks (mock using prompt or fixed template)
+      roomId = 'room-' + Date.now();
+      tasks = [
+        { id: 't1', title: '案内経路を整理する', status: 'open' },
+        { id: 't2', title: '備品を数える', status: 'open' },
+        { id: 't3', title: '落し物対応', status: 'open' }
+      ];
+      roomEl.textContent = roomId;
+      renderTasks();
+      // generate QR - prefer detected backend so the QR points to the working backend
+      const base = window.__detectedBackend || (location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : ''));
+      const participantUrl = base + '/participant.html?room=' + encodeURIComponent(roomId);
+      const qr = new QRious({ element: qrEl, value: participantUrl, size: 220 });
+      queuedEmit('room:create', { room: roomId, tasks });
+    };
+
+    // register event handlers when socket becomes available
+    function registerSocketHandlers(s){
+      if (!s) return;
+      s.on('room:join', ({ room, participants }) => {
+        if (room !== roomId) return;
+        countEl.textContent = participants;
+      });
+      s.on('task:update', ({ room, tasks: updated }) => {
+        if (room !== roomId) return;
+        tasks = updated;
+        renderTasks();
+      });
+    }
+
+    // watch for socket becoming available
+    (function watchSocket(){
+      if (window.__socket) return registerSocketHandlers(window.__socket);
+      setTimeout(watchSocket, 200);
+    })();
+
+    function renderTasks() {
+      tasksEl.innerHTML = '';
+      const total = tasks.length;
+      const done = tasks.filter(t => t.status === 'done').length;
+      gauge.style.width = ((done/total)*100) + '%';
+      tasks.forEach(t => {
+        const d = document.createElement('div');
+        d.className = 'task';
+        d.textContent = `${t.id} - ${t.title} [${t.status}]`;
+        tasksEl.appendChild(d);
+      });
+    }
+
+    // MCP test helpers
+    // helper that attempts candidate backend origins
+    async function tryBackends(path, options){
+      const proto = location.protocol;
+      const host = location.hostname;
+  // try same-origin first, then demo backend ports, then explicit page port
+  const ports = ['', '3002','3001','3000'];
+  if (location.port && !ports.includes(location.port)) ports.push(location.port);
+
+      // if a backend was detected earlier, try that first
+      if (window.__detectedBackend){
+        try {
+          const r = await fetch(window.__detectedBackend + path, options);
+          if (r.status !== 404) return r;
+        } catch (e){ /* fallthrough to try list */ }
+      }
+
+      for (const p of ports){
+        const base = proto + '//' + host + (p ? ':'+p : '');
+        const url = base + path;
+        try {
+          const r = await fetch(url, options);
+          if (r.status === 404) continue;
+          // cache the working backend
+          window.__detectedBackend = base;
+          document.getElementById('backendStatus').textContent = base;
+          return r;
+        } catch (e){ continue; }
+      }
+      throw new Error('all backends failed');
+    }
+
+    // detect backend once on load using an unauthenticated /health endpoint
+    (async function detectBackend(){
+      const statusEl = document.getElementById('backendStatus');
+      statusEl.textContent = 'detecting...';
+      try{
+        const r = await tryBackends('/health', { method: 'GET' });
+        // read json to ensure it is the Node backend
+        const j = await r.json();
+        if (j && j.status === 'ok'){
+          const url = window.__detectedBackend || (location.protocol + '//' + location.hostname + (location.port ? ':'+location.port : ''));
+          statusEl.textContent = url;
+          return;
+        }
+      } catch(e){
+        // fallthrough to mcp probe below
+      }
+      // fallback: try an authenticated MCP endpoint (may succeed if health is blocked)
+      try{
+        const r2 = await tryBackends('/mcp/fetch?url=' + encodeURIComponent('https://example.com') + '&apiKey=devkey123', { method: 'GET' });
+        if (r2) statusEl.textContent = window.__detectedBackend || 'detected';
+      } catch(e){
+        statusEl.textContent = 'unreachable';
+        console.warn('backend detect failed', e.message);
+      }
+    })();
+
+    document.getElementById('testFetch').onclick = async () => {
+      const url = document.getElementById('testUrl').value;
+      const out = document.getElementById('fetchOut');
+      out.value = 'Loading...';
+      try {
+        const path = '/mcp/fetch?url=' + encodeURIComponent(url) + '&apiKey=devkey123';
+        const r = await tryBackends(path, { method: 'GET' });
+        const j = await r.json();
+        out.value = j.markdown || JSON.stringify(j, null, 2);
+        document.getElementById('fetchErr').textContent = '';
+      } catch (e) { out.value = ''; document.getElementById('fetchErr').textContent = e.message }
+    };
+
+    document.getElementById('testStepify').onclick = async () => {
+      const out = document.getElementById('stepOut');
+      out.value = 'Loading...';
+      try {
+        const path = '/mcp/stepify';
+        const r = await tryBackends(path, { method: 'POST', headers: { 'Content-Type':'application/json', 'x-api-key':'devkey123' }, body: JSON.stringify({ text: '写真を撮る。来場者を誘導する。忘れ物対応をする。' }) });
+        const j = await r.json();
+        out.value = JSON.stringify(j, null, 2);
+        document.getElementById('stepErr').textContent = '';
+      } catch (e) { out.value = ''; document.getElementById('stepErr').textContent = e.message }
+    };
+  </script>
+</body>
+</html>

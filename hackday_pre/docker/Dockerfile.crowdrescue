@@ -1,0 +1,14 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# install runtime deps only
+COPY crowdrescue/package.json crowdrescue/package-lock.json* ./
+RUN npm install --production
+
+COPY crowdrescue/ .
+
+ENV PORT=3003
+EXPOSE 3003
+
+CMD ["node", "server.js"]
