@@ -13,7 +13,7 @@
 ```bash
 docker build -t jphack_front:v1 -f Docker/Dockerfile.frontend .
 ```
-(2)コンテナに入る
+(2)コンテナに入る(windows以外)
 ```bash
 docker run --rm -it \
   --name jphack_front \
@@ -24,6 +24,21 @@ docker run --rm -it \
   --entrypoint sh \
   jphack_front:v1
 ```
+### windowsの場合
+コンテナに入る(windows以外)
+```bash
+$front=(Get-Location).Path -replace '\\','/'; 
+docker run --rm -it \
+  --name jphack_front \
+  -p 3000:3000 \
+  -v "$PWD/frontend":/app \
+  -v jphack_node_modules:/app/node_modules \
+  -e CHOKIDAR_USEPOLLING=true \
+  --entrypoint sh \
+  jphack_front:v1
+```
+
+
 (3)モジュールのインストール
 ```bash
 npm install
