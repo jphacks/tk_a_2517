@@ -42,19 +42,28 @@
 
 ## 開発技術
 
-・Next.js
-
 ### 活用した技術
 
 #### API・データ
 
--
--
+- Socket.IO
 
 #### フレームワーク・ライブラリ・モジュール
 
--
--
+- Next.js
+- React
+- Node.js
+- Express.js
+- FastAPI
+- PyTorch
+- Transformers
+- Axios
+- Uvicorn
+
+####　インフラ/その他
+
+- Docker
+- Vercel
 
 #### デバイス
 
