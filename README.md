@@ -49,6 +49,19 @@
 - **楽しさを通じた地域貢献:** スタンプラリー機能で観光をゲーム化し、能動的な周遊を促すことで地域経済の活性化を目指しました。
 - **シンプルさと先進性の両立:** 手軽な QR コードを入り口に、バックエンドでは LLM などの先進技術を活用。導入のしやすさと高度な体験を両立させました。
 
+## 🚀 デプロイ方法
+
+### PowerShell (Windows)
+```powershell
+powershell -ExecutionPolicy Bypass -File vercel_deploy.ps1
+```
+
+### 手動デプロイ
+1. Vercel CLIをインストール: `npm install -g vercel`
+2. ログイン: `vercel login`
+3. フロントエンドをデプロイ: `cd frontend && vercel --prod`
+4. QR Alertをデプロイ: `cd QR_alert && vercel --prod`
+
 ## 開発技術
 
 ### 活用した技術
@@ -65,6 +78,7 @@
 #### その他
 
 - Docker
+- Vercel
 
 ### 独自技術
 
