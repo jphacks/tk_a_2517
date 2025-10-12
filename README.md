@@ -60,19 +60,11 @@
 
 #### バックエンド
 
-- Node.js
-- Express.js
-- FastAPI
-
-#### AI・機械学習
-
-- PyTorch
-- Transformers
+- Next.js
 
 #### その他
 
 - Docker
-- Vercel
 
 ### 独自技術
 
