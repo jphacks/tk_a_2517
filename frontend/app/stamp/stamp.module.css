@@ -1,0 +1,283 @@
+/* app/kyoto/kyoto.module.css */
+
+/* ベース */
+.pageRoot {
+  background: #f5f1e8;
+  min-height: 100vh;
+  padding: 20px;
+  font-family: system-ui, -apple-system, "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "メイリオ", Meiryo, sans-serif;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #faf8f3;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  border: 2px solid #e8dcc6;
+}
+
+.controls {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.primaryBtn {
+  padding: 12px 24px;
+  background: #8b4513;
+  color: #f5f1e8;
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(139,69,19,0.3);
+  font-weight: bold;
+}
+
+.error {
+  background: #ffe6e6;
+  color: #d00;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+/* スタンプ UI */
+.stampContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 30px 0;
+  background: #f5f1e8;
+  padding: 25px;
+  border-radius: 15px;
+  border: 3px solid #d4c4a8;
+}
+
+.stampGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.stampSlot {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 4px solid #d4c4a8;
+  position: relative;
+}
+.stampSlot:hover {
+  transform: scale(1.15);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+}
+.visited {
+  background: #d4c4a8;
+  border-color: #8b4513;
+  color: #8b4513;
+  box-shadow: 0 8px 16px rgba(139,69,19,0.3);
+  animation: pulse 2s infinite;
+}
+.placeholder {
+  background: #e8dcc6;
+  border-color: #c4b5a0;
+  color: #8b7355;
+}
+
+.stampIcon {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.stampText {
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.2;
+  font-weight: bold;
+}
+
+.stampTitle {
+  font-size: 28px;
+  font-weight: bold;
+  color: #8b4513;
+  margin-bottom: 12px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+.stampSubtitle {
+  font-size: 16px;
+  color: #8b7355;
+  margin-bottom: 24px;
+}
+
+/* 進捗バー */
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background: #e8dcc6;
+  border-radius: 4px;
+  margin: 20px 0;
+  overflow: hidden;
+  border: 2px solid #d4c4a8;
+}
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b4513, #a0522d);
+  transition: width 0.5s ease;
+  border-radius: 4px;
+}
+
+/* 統計 */
+.stats {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+  padding: 15px;
+  background: #f5f1e8;
+  border-radius: 12px;
+  border: 2px solid #d4c4a8;
+}
+.statItem {
+  text-align: center;
+}
+.statNumber {
+  font-size: 24px;
+  font-weight: bold;
+  color: #8b4513;
+}
+.statLabel {
+  font-size: 12px;
+  color: #8b7355;
+  margin-top: 4px;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 8px 16px rgba(139,69,19,0.3); }
+  50% { box-shadow: 0 8px 16px rgba(139,69,19,0.6); }
+  100% { box-shadow: 0 8px 16px rgba(139,69,19,0.3); }
+}
+
+/* モーダル */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  -webkit-backdrop-filter: blur(0px);
+  backdrop-filter: blur(0px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.modalCard {
+  position: relative;
+  max-width: 600px;
+  max-height: 80vh;
+  background: #faf8f3;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  border: 3px solid #8b4513;
+}
+.modalClose {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  border: none;
+  background: #8b4513;
+  color: #f5f1e8;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 20px;
+  box-shadow: 0 4px 8px rgba(139,69,19,0.3);
+}
+.modalBody {
+  text-align: center;
+  max-height: 70vh;
+  overflow: auto;
+}
+.modalHeader {
+  margin-bottom: 16px;
+}
+.modalIcon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+.modalTitle {
+  margin: 0;
+  color: #333;
+}
+.modalAttrs {
+  text-align: left;
+  margin-bottom: 16px;
+}
+.modalImageWrap {
+  margin-bottom: 16px;
+}
+.modalImage {
+  max-width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.modalMarkdown {
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.modalPlaceholderText {
+  color: #999;
+  margin-top: 8px;
+}
+
+/* ヒント */
+.hint {
+  margin-top: 30px;
+  color: #8b7355;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* 通知（スタンプ獲得） */
+.notification {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #8b4513, #a0522d);
+  color: #f5f1e8;
+  padding: 20px 30px;
+  border-radius: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  z-index: 10001;
+  box-shadow: 0 10px 30px rgba(139,69,19,0.5);
+  border: 3px solid #d4c4a8;
+  animation: stampGet 2s ease-out forwards;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.notificationIcon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+.notificationSmall {
+  font-size: 14px;
+  margin-top: 4px;
+}
+@keyframes stampGet {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  80% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}

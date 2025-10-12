@@ -434,7 +434,7 @@ export function initializeStampRally() {
     const canvas = document.getElementById('qrCanvas');
     
     // 現在のURLをQRコードとして生成
-    const currentUrl = typeof window !== 'undefined' ? window.location.href : 'http://localhost:3000/sightseeing';
+  const currentUrl = typeof window !== 'undefined' ? `${window.location.origin}/stamp?difficulty=medium&auto=1` : 'http://localhost:3000/stamp?difficulty=medium&auto=1';
     const qr = new QRious({ 
       element: canvas, 
       value: currentUrl, 
@@ -547,7 +547,7 @@ export function initializeStampRally() {
     }
     
     // 検出されたURLが現在のページと同じかチェック
-    const currentUrl = typeof window !== 'undefined' ? window.location.href : 'http://localhost:3000/sightseeing';
+  const currentUrl = typeof window !== 'undefined' ? `${window.location.origin}/stamp?difficulty=medium&auto=1` : 'http://localhost:3000/stamp?difficulty=medium&auto=1';
     if (decodedText === currentUrl || decodedText.includes('route_navigator')) {
       showQRSuccess();
       setTimeout(() => {

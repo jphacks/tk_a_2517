@@ -1,0 +1,21 @@
+{
+  "difficulties": ["detailed", "medium", "simple"],
+  "labels": {"detailed": "詳し目", "medium": "中くらい", "simple": "簡単"},
+  "items": {
+    "kinkakuji": {
+      "detailed": "/json/stamp/kinkakuji.detailed.json",
+      "medium": "/json/stamp/kinkakuji.medium.json",
+      "simple": "/json/stamp/kinkakuji.simple.json"
+    },
+    "ginkakuji": {
+      "detailed": "/json/stamp/ginkakuji.detailed.json",
+      "medium": "/json/stamp/ginkakuji.medium.json",
+      "simple": "/json/stamp/ginkakuji.simple.json"
+    },
+    "kiyomizudera": {
+      "detailed": "/json/stamp/kiyomizudera.detailed.json",
+      "medium": "/json/stamp/kiyomizudera.medium.json",
+      "simple": "/json/stamp/kiyomizudera.simple.json"
+    }
+  }
+}

@@ -54,7 +54,8 @@ export default function SightseeingClient() {
     return { collected, total, rate };
   }, [visited, data]);
 
-  const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+  // Build a QR that points to the stamp page (auto start)
+  const stampUrl = typeof window !== "undefined" ? `${window.location.origin}/stamp?difficulty=medium&auto=1` : "/stamp?difficulty=medium&auto=1";
 
   const iconFor = (loc) => {
     const iconMap = {
@@ -101,15 +102,21 @@ export default function SightseeingClient() {
     const img = ctx.getImageData(0, 0, w, h);
     const code = jsQR(img.data, w, h);
     if (code?.data) {
-      const txt = code.data;
-      if (txt === currentUrl || (typeof window !== "undefined" && txt.startsWith(window.location.origin))) {
-        setScanStatus("success");
-        stopScanning(false);
-        return;
-      } else {
-        setScanStatus("error");
-        // keep scanning; minor delay would be handled by next frame
+      const raw = (code.data || "").trim();
+      try {
+        const u = new URL(raw, typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+        // If QR is for /stamp, navigate there
+        if (u.pathname.startsWith("/stamp")) {
+          setScanStatus("success");
+          stopScanning(false);
+          if (typeof window !== "undefined") window.location.href = u.toString();
+          return;
+        }
+      } catch (e) {
+        // fallthrough to error
       }
+      setScanStatus("error");
+      // keep scanning; minor delay would be handled by next frame
     }
     rafRef.current = requestAnimationFrame(scanLoop);
   };
@@ -243,7 +250,7 @@ export default function SightseeingClient() {
             </p>
 
             {!scanning ? (
-              <QRCodeCanvas value={currentUrl} size={220} level="M" bgColor="#ffffff" fgColor="#000000" />
+              <QRCodeCanvas value={stampUrl} size={220} level="M" bgColor="#ffffff" fgColor="#000000" />
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, placeItems: "center" }}>
                 <video ref={videoRef} style={{ width: 240, height: 180, background: "#000" }} playsInline muted />
@@ -262,10 +269,18 @@ export default function SightseeingClient() {
               ) : (
                 <button className="qr-button qr-button-secondary" onClick={() => stopScanning(true)}>スキャン停止</button>
               )}
-              <button className="qr-button qr-button-primary" style={{ marginLeft: 8 }} onClick={() => { stopScanning(false); setQrOpen(false); }}>
+              <button
+                className="qr-button qr-button-primary"
+                style={{ marginLeft: 8 }}
+                onClick={() => { stopScanning(false); setQrOpen(false); if (typeof window !== 'undefined') window.location.href = stampUrl; }}
+              >
                 QR読み取り完了・開始
               </button>
-              <button className="qr-button qr-button-secondary" style={{ marginLeft: 8 }} onClick={() => { stopScanning(true); setQrOpen(false); }}>
+              <button
+                className="qr-button qr-button-secondary"
+                style={{ marginLeft: 8 }}
+                onClick={() => { stopScanning(true); setQrOpen(false); if (typeof window !== 'undefined') window.location.href = stampUrl; }}
+              >
                 スキップして開始
               </button>
             </div>
