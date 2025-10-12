@@ -1,8 +1,7 @@
 // app/kyoto/page.js
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import styles from './stamp.module.css';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { marked } from 'marked';
 
 // ---------- 追加: API用の JSON フェッチ ----------
@@ -58,7 +57,17 @@ export default function KyotoStampRallyPage() {
   const [showUI, setShowUI] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalLocation, setModalLocation] = useState(null);
+  const [stampGetVisible, setStampGetVisible] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoItem, setPromoItem] = useState(null);
   const [error, setError] = useState(null);
+  const promoTimerRef = useRef(null);
+  const [rankedItems, setRankedItems] = useState(null);
+  const [preferredRank, setPreferredRank] = useState(null);
+
+  const triggerStampGetAndPromo = useCallback(() => {
+    triggerStampGetAndPromoExternal(setStampGetVisible, setPromoOpen, setPromoItem, setRankedItems, promoTimerRef);
+  }, []);
 
   // データ読み込み
   async function loadJsonFromUrl(url) {
@@ -91,6 +100,21 @@ export default function KyotoStampRallyPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Parse rank/auto from URL and optionally trigger promo automatically
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const usp = new URLSearchParams(window.location.search);
+    const rank = parseInt(usp.get('rank') || '', 10);
+    const auto = usp.get('auto');
+    if (Number.isInteger(rank) && rank >= 1 && rank <= 3) {
+      setPreferredRank(rank);
+    }
+    if (auto && showUI) {
+      // trigger after initial UI shows
+      triggerStampGetAndPromo();
+    }
+  }, [showUI]);
 
   // スタンプラリー開始
   function startStampRally(d = data) {
@@ -147,7 +171,9 @@ export default function KyotoStampRallyPage() {
   function onStampClick(location) {
     const isVisited = visited.has(location.id);
     if (isVisited) {
-      openStampModal(location, true);
+      // 要件: 1) Stamp Get! エフェクト → 2秒後にプロモ画面
+      // ここでは訪問済みスタンプをクリックした時に演出を見せる
+      triggerStampGetAndPromo();
     } else {
       // クリックでは何もしない（状態変更しない）
       // 必要なら軽いトースト表示など:
@@ -169,52 +195,55 @@ export default function KyotoStampRallyPage() {
   const remainingSlots = Math.max(0, 6 - locationsToShow.length);
 
   return (
-    <div className={styles.pageRoot}>
-      <div className={styles.container}>
+    <div className="pageRoot">
+      {/* Link public CSS: ranked modal and globalized module styles */}
+      <link rel="stylesheet" href="/css/stamp/stamp.css" />
+      <link rel="stylesheet" href="/css/stamp/stamp.module.css" />
+      <div className="container">
         <h1>🏯 京都スタンプラリー</h1>
         <p>京都の名所を巡ってスタンプを集めよう！各観光地をクリックして詳細を確認できます。</p>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && <div className="error">{error}</div>}
 
         {showUI && (
-          <div className={styles.stampContainer}>
-            <div className={styles.stampTitle}>STAMP GET!</div>
-            <div className={styles.stampSubtitle}>観光地を巡ってスタンプを集めよう！</div>
+          <div className="stampContainer">
+            <div className="stampTitle">STAMP GET!</div>
+            <div className="stampSubtitle">観光地を巡ってスタンプを集めよう！</div>
 
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${completionRate}%` }} />
+            <div className="progressBar">
+              <div className="progressFill" style={{ width: `${completionRate}%` }} />
             </div>
 
-            <div className={styles.stats}>
-              <div className={styles.statItem}>
-                <div className={styles.statNumber}>{collectedCount}</div>
-                <div className={styles.statLabel}>獲得済み</div>
+            <div className="stats">
+              <div className="statItem">
+                <div className="statNumber">{collectedCount}</div>
+                <div className="statLabel">獲得済み</div>
               </div>
-              <div className={styles.statItem}>
-                <div className={styles.statNumber}>{totalCount}</div>
-                <div className={styles.statLabel}>総数</div>
+              <div className="statItem">
+                <div className="statNumber">{totalCount}</div>
+                <div className="statLabel">総数</div>
               </div>
-              <div className={styles.statItem}>
-                <div className={styles.statNumber}>{completionRate}%</div>
-                <div className={styles.statLabel}>達成率</div>
+              <div className="statItem">
+                <div className="statNumber">{completionRate}%</div>
+                <div className="statLabel">達成率</div>
               </div>
             </div>
 
-            <div className={styles.stampGrid}>
+            <div className="stampGrid">
               {locationsToShow.map((loc, idx) => {
                 const isVisited = visited.has(loc.id);
                 return (
                   <div
                     key={loc.id}
                     data-index={idx}
-                    className={`${styles.stampSlot} ${isVisited ? styles.visited : styles.placeholder}`}
+                    className={`stampSlot ${isVisited ? 'visited' : 'placeholder'}`}
                     onClick={() => onStampClick(loc)}
                   >
-                    <div className={styles.stampIcon}>
+                    <div className="stampIcon">
                       {isVisited ? getLocationIcon(loc) : '?'}
                     </div>
                     {isVisited && (
-                      <div className={styles.stampText}>
+                      <div className="stampText">
                         {loc.name.length > 8 ? `${loc.name.slice(0, 8)}...` : loc.name}
                       </div>
                     )}
@@ -225,35 +254,72 @@ export default function KyotoStampRallyPage() {
                 <div
                   key={`ph-${i}`}
                   data-index={locationsToShow.length + i}
-                  className={`${styles.stampSlot} ${styles.placeholder}`}
+                  className={`stampSlot placeholder`}
                   onClick={onPlaceholderClick}
                 >
-                  <div className={styles.stampIcon}>?</div>
+                  <div className="stampIcon">?</div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <p className={styles.hint}>💡 ヒント: スタンプをクリックして観光地の詳細を確認できます！</p>
+        <p className="hint">💡 ヒント: スタンプをクリックして観光地の詳細を確認できます！</p>
       </div>
 
+      {/* 1) Stamp Get! エフェクト */}
+      {stampGetVisible && (
+        <div className="notification" role="status" aria-live="polite">
+          <div className="notificationIcon">🎉</div>
+          <div>STAMP GET!</div>
+          <div className="notificationSmall">おめでとうございます！</div>
+        </div>
+      )}
+
+      {/* 2) プロモ画面（要件の画像＋説明文） */}
+      {promoOpen && promoItem && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={() => closePromo(setPromoOpen, promoTimerRef)}>
+          <div className="promoCard" onClick={(e) => e.stopPropagation()}>
+            <button className="modalClose" onClick={() => closePromo(setPromoOpen, promoTimerRef)}>✕</button>
+            <div className="promoBody">
+              <img src={promoItem.image} alt="stamp" className="promoImage" />
+              <div className="promoText">{promoItem.text}</div>
+            </div>
+            {/* Ranked modal (1~3) displayed below when available */}
+            {rankedItems && (
+              <div className="stamp-ranked-modal" onClick={() => closePromo(setPromoOpen, promoTimerRef)}>
+                <div className="stamp-ranked-card" onClick={(e) => e.stopPropagation()}>
+                  <button className="stamp-ranked-close" onClick={() => closePromo(setPromoOpen, promoTimerRef)}>✕</button>
+                  {rankedItems.map((it) => (
+                    <div key={it.id} className="stamp-ranked-item">
+                      <img src={it.image} alt={it.id} className="stamp-ranked-image" />
+                      <div className="stamp-ranked-rank">No.{it.rank}</div>
+                      <div className="stamp-ranked-text">{it.text}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {modalOpen && (
-        <div className={styles.modal} onClick={closeStampModal} role="dialog" aria-modal="true">
-          <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-            <button className={styles.modalClose} onClick={closeStampModal}>✕</button>
-            <div className={styles.modalBody}>
+        <div className="modal" onClick={closeStampModal} role="dialog" aria-modal="true">
+          <div className="modalCard" onClick={(e) => e.stopPropagation()}>
+            <button className="modalClose" onClick={closeStampModal}>✕</button>
+            <div className="modalBody">
               {!modalLocation?.placeholder ? (
                 <>
-                  <div className={styles.modalHeader}>
-                    <div className={styles.modalIcon}>
+                  <div className="modalHeader">
+                    <div className="modalIcon">
                       {modalLocation ? getLocationIcon(modalLocation) : '📍'}
                     </div>
-                    <h3 className={styles.modalTitle}>{modalLocation?.name ?? ''}</h3>
+                    <h3 className="modalTitle">{modalLocation?.name ?? ''}</h3>
                   </div>
 
                   {modalLocation?.attributes && (
-                    <div className={styles.modalAttrs}>
+                    <div className="modalAttrs">
                       <p><strong>特徴:</strong> {modalLocation.attributes.benefit}</p>
                       <p><strong>混雑度:</strong> {getCrowdLevelText(modalLocation.attributes.crowd_level)}</p>
                       <p><strong>テーマ:</strong> {getThemeText(modalLocation.attributes.theme)}</p>
@@ -261,13 +327,13 @@ export default function KyotoStampRallyPage() {
                   )}
 
                   {modalLocation?.image && (
-                    <div className={styles.modalImageWrap}>
-                      <img src={modalLocation.image} alt={modalLocation.name} className={styles.modalImage} />
+                    <div className="modalImageWrap">
+                      <img src={modalLocation.image} alt={modalLocation.name} className="modalImage" />
                     </div>
                   )}
 
                   <div
-                    className={styles.modalMarkdown}
+                    className="modalMarkdown"
                     dangerouslySetInnerHTML={{
                       __html: marked.parse(
                         modalLocation?.markdown_details ||
@@ -278,11 +344,11 @@ export default function KyotoStampRallyPage() {
                 </>
               ) : (
                 <>
-                  <div className={styles.modalHeader}>
-                    <div className={styles.modalIcon}>❓</div>
-                    <h3 className={styles.modalTitle}>未実装の観光地</h3>
+                  <div className="modalHeader">
+                    <div className="modalIcon">❓</div>
+                    <h3 className="modalTitle">未実装の観光地</h3>
                   </div>
-                  <p className={styles.modalPlaceholderText}>今後追加予定の観光地です！</p>
+                  <p className="modalPlaceholderText">今後追加予定の観光地です！</p>
                 </>
               )}
             </div>
@@ -291,4 +357,60 @@ export default function KyotoStampRallyPage() {
       )}
     </div>
   );
+}
+
+// 追加: プロモ表示のロジック
+async function loadStampPromos() {
+  try {
+    // If a preferred rank was given, map it to the corresponding JSON and return it
+    // otherwise, fall back to random choice among 1..3
+    const pick = async (r) => fetch(`/json/stamp/${r}.json`, { cache: 'no-store' }).then((x) => x.ok ? x.json() : null);
+    if (typeof window !== 'undefined') {
+      const usp = new URLSearchParams(window.location.search);
+      const rank = parseInt(usp.get('rank') || '', 10);
+      if (Number.isInteger(rank) && rank >= 1 && rank <= 3) {
+        const v = await pick(rank);
+        if (v) return v;
+      }
+    }
+    const r = Math.floor(Math.random() * 3) + 1;
+    return await pick(r);
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+}
+
+function triggerStampGetAndPromoExternal(setStampGetVisible, setPromoOpen, setPromoItem, setRankedItems, promoTimerRef) {
+  // 1) Stamp Get! を 2秒表示
+  setStampGetVisible(true);
+  if (promoTimerRef.current) clearTimeout(promoTimerRef.current);
+  promoTimerRef.current = setTimeout(async () => {
+    setStampGetVisible(false);
+    // 2) ランダム画像＋テキスト（JSON駆動）を表示
+    const item = await loadStampPromos();
+    if (item) {
+      setPromoItem(item);
+      // also load ranked 1..3 JSONs for the /stamp ranked view
+      try {
+        const r1 = await fetch('/json/stamp/1.json', { cache: 'no-store' }).then((r) => r.json());
+        const r2 = await fetch('/json/stamp/2.json', { cache: 'no-store' }).then((r) => r.json());
+        const r3 = await fetch('/json/stamp/3.json', { cache: 'no-store' }).then((r) => r.json());
+        setRankedItems([r1, r2, r3]);
+      } catch (e) {
+        console.error('failed load ranked', e);
+        setRankedItems(null);
+      }
+      setPromoOpen(true);
+    }
+  }, 2000);
+}
+
+// Helper to close promo and clear timer
+function closePromo(setPromoOpen, promoTimerRef) {
+  if (promoTimerRef.current) {
+    clearTimeout(promoTimerRef.current);
+    promoTimerRef.current = null;
+  }
+  setPromoOpen(false);
 }

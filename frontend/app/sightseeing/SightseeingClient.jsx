@@ -12,6 +12,7 @@ export default function SightseeingClient() {
   const [qrOpen, setQrOpen] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("idle"); // idle | scanning | success | error
+  const [qrRank, setQrRank] = useState(() => Math.floor(Math.random() * 3) + 1);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
@@ -142,6 +143,13 @@ export default function SightseeingClient() {
     return () => stopScanning();
   }, []);
 
+  // When QR modal opens, pick a fresh random rank 1..3
+  useEffect(() => {
+    if (qrOpen) {
+      setQrRank(Math.floor(Math.random() * 3) + 1);
+    }
+  }, [qrOpen]);
+
   return (
     <div className="container" style={{ background: "#f5f1e8", minHeight: "100vh", padding: "16px" }}>
       {/* Try to bring in existing CSS; safe no-op if not found */}
@@ -243,7 +251,7 @@ export default function SightseeingClient() {
             </p>
 
             {!scanning ? (
-              <QRCodeCanvas value={currentUrl} size={220} level="M" bgColor="#ffffff" fgColor="#000000" />
+              <QRCodeCanvas value={(typeof window !== "undefined") ? `${window.location.origin}/stamp?rank=${qrRank}&auto=1` : ""} size={220} level="M" bgColor="#ffffff" fgColor="#000000" />
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, placeItems: "center" }}>
                 <video ref={videoRef} style={{ width: 240, height: 180, background: "#000" }} playsInline muted />
