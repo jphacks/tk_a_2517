@@ -127,26 +127,18 @@ export default function VisitPage() {
                     <>
                       {/* Reward icon overlay for Kinkakuji */}
                       {loc.id === 'kinkakuji' && (
-                        <img
-                          src={rewardIcon}
-                          alt="reward"
-                          style={{ position: 'absolute', top: -12, left: -12, width: 36, height: 36, borderRadius: '50%', boxShadow: '0 1px 2px rgba(0,0,0,0.2)', objectFit: 'cover' }}
-                        />
+                        <img src={rewardIcon} alt="reward" className={styles.rewardBadge} />
                       )}
                       {isNew && (
-                        <div style={{ position: 'absolute', top: -10, right: -10, background: '#ff2', color: '#c00', fontWeight: 700, padding: '2px 6px', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }}>
-                          NEW!
-                        </div>
+                        <div className={styles.newBadge}>NEW!</div>
                       )}
-                      <div style={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', margin: '0 auto' }}>
-                        <img src={loc.image} alt={loc.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      </div>
+                      <img src={loc.image} alt={loc.name} className={styles.stampImageOriginal} />
                       <div className={styles.stampText} style={{ marginTop: 8 }}>{loc.name}</div>
                     </>
                   ) : (
                     <>
                       <div className={styles.stampIcon} style={{ width: 96, height: 96, lineHeight: '96px', borderRadius: '50%' }}>?</div>
-                      <div className={styles.stampText} style={{ opacity: 0.6, marginTop: 8 }}>場所名<br />訪れた日時</div>
+                      {/* no name/text when image is not present so the ? stays vertically centered */}
                     </>
                   )}
                 </div>
