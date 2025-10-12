@@ -1,4 +1,4 @@
-// 京都スタンプラリー - JavaScript版 (Legacy)
+// QRally - JavaScript版 (Legacy)
 // 注意: このファイルはレガシー（非 React）実装です。
 // 現在は JSX/React ベースの SightseeingClient.jsx が採用され、page.js から読み込まれます。
 // 互換性のために残していますが、新機能や修正は SightseeingClient.jsx 側に実装します。
@@ -13,12 +13,12 @@ export function generateStampRallyHTML() {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>京都スタンプラリー</title>
+  <title>QRally</title>
   <link rel="stylesheet" href="/css/sightseeing/sightseeing.css">
 </head>
 <body>
   <div class="container">
-    <h1>🏯 京都スタンプラリー</h1>
+    <h1>QRally</h1>
     <p>京都の名所を巡ってスタンプを集めよう！各観光地をクリックして詳細を確認できます。</p>
 
     <div class="controls" style="text-align:center;margin:20px 0">
@@ -62,7 +62,8 @@ export function generateStampRallyHTML() {
     <div id="qrIntroModal" class="modal qr-modal">
       <div class="modal-content qr-modal-content">
         <button id="qrIntroClose" class="modal-close">✕</button>
-        <h2 style="margin-top:0;color:#8b4513">🏯 京都スタンプラリー</h2>
+        <h2 style="margin-top:0;color:#8b4513">QRally
+</h2>
         <h3 style="color:#8b7355;margin:10px 0">QRコードを読み取って開始</h3>
         <p style="color:#8b7355;margin-bottom:20px">スマホのカメラでQRコードを読み取ると、同じページが開きます。<br>読み取り後にスタンプラリーが開始されます。</p>
         <canvas id="qrCanvas" width="220" height="220" class="qr-canvas"></canvas>

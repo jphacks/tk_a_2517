@@ -89,9 +89,9 @@ export default function VisitPage() {
   return (
     <div className={styles.pageRoot}>
       <div className={styles.container}>
-        <h1>○○スタンプシート</h1>
+        <h1>QRally 保有スタンプ</h1>
         <div style={{ display: 'flex', gap: 32, marginBottom: 16, alignItems: 'center' }}>
-          <div>スタンプ保有数：{collectedCount} / {totalCount}</div>
+          <div>スタンプ保有数：{collectedCount}個</div>
           <div>所持ポイント数：{points}p</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Reward:</span>

@@ -50,7 +50,7 @@ export default function AcquiredPopup({ item: itemProp = null, id = null, initia
 
         <div className={styles.modalBody}>
           <div className={styles.modalHeader}>
-            <h2 className={styles.modalTitle}>獲得した画像</h2>
+            <h2 className={styles.modalTitle}>獲得したスタンプ</h2>
           </div>
 
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>

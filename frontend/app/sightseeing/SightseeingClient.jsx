@@ -154,7 +154,7 @@ export default function SightseeingClient() {
       {/* Try to bring in existing CSS; safe no-op if not found */}
       <link rel="stylesheet" href="/css/sightseeing/sightseeing.css" />
 
-      <h1>🏯 京都スタンプラリー</h1>
+      <h1>QRally</h1>
       <p>京都の名所を巡ってスタンプを集めよう！各観光地をクリックして詳細を確認できます。</p>
 
       {/* Progress and grid */}
@@ -243,7 +243,7 @@ export default function SightseeingClient() {
         <div className="modal qr-modal" style={{ display: "flex" }}>
           <div className="modal-content qr-modal-content" style={{ textAlign: "center" }}>
             <button className="modal-close" onClick={() => setQrOpen(false)}>✕</button>
-            <h2 style={{ marginTop: 0, color: "#8b4513" }}>🏯 京都スタンプラリー</h2>
+            <h2 style={{ marginTop: 0, color: "#8b4513" }}>QRally</h2>
             <h3 style={{ color: "#8b7355", margin: "10px 0" }}>QRコードを読み取って開始</h3>
             <p style={{ color: "#8b7355", marginBottom: 20 }}>
               スマホのカメラでQRコードを読み取ると、同じページが開きます。<br />読み取り後にスタンプラリーが開始されます。

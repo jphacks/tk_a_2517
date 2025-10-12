@@ -332,7 +332,7 @@ export default function KyotoStampRallyPage() {
             >
               ✕
             </button>
-            <div className={styles.stampTitle}>獲得した画像</div>
+            <div className={styles.stampTitle}>獲得したスタンプ</div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 12 }}>
               <img src={currentItem.image} alt={currentItem.id} className={styles.promoImage} style={{ maxWidth: 360, height: 'auto', flex: '0 0 auto' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
