@@ -42,6 +42,7 @@ docker run --rm -it \
 (3)モジュールのインストール
 ```bash
 npm install
+npm install marked
 ```
 (4)サーバーの起動
 ```bash
@@ -98,7 +99,19 @@ npm run dev
 
 ---
 
+## ページ構成
+
+(1)http://localhost:3000/visit?query=0（１、または２）
+
+QRコードを読み込んだ時に飛ばされるページ。queryで指定した観光地を訪問済みにする。
+
+(2)http://localhost:3000/stamp
+取得ずみのスタンプが見れる
+
 ## ディレクトリ構造
+
+
+
 以下のMonorepo構成を採用することで、Vercelがどのディレクトリをビルド対象とするかを明確化します。
 
 ```
