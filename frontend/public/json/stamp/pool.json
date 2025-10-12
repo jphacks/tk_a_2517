@@ -1,0 +1,26 @@
+[
+  {
+    "id": "kinkakuji",
+    "image": "/img/kinkakuzi.jpg",
+    "text": "黄金に輝く金閣寺。鏡湖池に映る姿は息を呑む美しさ。",
+    "rank": 1
+  },
+  {
+    "id": "ginkakuji",
+    "image": "/img/ginkakuzi.jpg",
+    "text": "静寂の銀閣寺。わびさびの世界で心を整える。",
+    "rank": 2
+  },
+  {
+    "id": "kiyomizudera",
+    "image": "/img/kiyomizudera.jpg",
+    "text": "清水の舞台から望む大パノラマ。新しい一歩の勇気を。",
+    "rank": 3
+  },
+  {
+    "id": "mystery",
+    "image": "/img/hatena.jpg",
+    "text": "次の発見はあなた次第…秘密のスポットを探しに行こう！",
+    "rank": 99
+  }
+]

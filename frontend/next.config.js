@@ -7,16 +7,18 @@ module.exports = {
   // 静的ファイルの配信設定
   async rewrites() {
     return [
+      // Sightseeing-only rewrites. Public assets like /css/stamp/* and /json/stamp/*
+      // will be served directly from /public without being rewritten.
       {
-        source: '/css/:path*',
+        source: '/css/sightseeing/:path*',
         destination: '/app/sightseeing/css/:path*',
       },
       {
-        source: '/json/:path*',
+        source: '/json/sightseeing/:path*',
         destination: '/app/sightseeing/json/:path*',
       },
       {
-        source: '/pic/:path*',
+        source: '/pic/sightseeing/:path*',
         destination: '/app/sightseeing/pic/:path*',
       },
     ];
