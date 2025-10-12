@@ -11,19 +11,51 @@
 #ルートディレクトリを想定する。
 (1)イメージのビルド
 ```bash
+docker
 docker build -t jphack_front:v1 -f Docker/Dockerfile.frontend .
 ```
-(2)コンテナに入る
+(1.1)作り直しの場合
 ```bash
-docker run --rm -it \
-  --name jphack_front \
-  -p 3000:3000 \
-  -v "$PWD/frontend":/app \
-  -v jphack_node_modules:/app/node_modules \
-  -e CHOKIDAR_USEPOLLING=true \
-  --entrypoint sh \
+docker stop jphack_front     
+docker rm jphack_front
+```
+(2)コンテナに入る(windows以外)
+```bash
+docker run --rm -it `
+  --name jphack_front `
+  -p 3000:3000 `
+  -v "${PWD}\frontend:/app" `
+  -v jphack_node_modules:/app/node_modules `
+  -e CHOKIDAR_USEPOLLING=true `
+  --entrypoint sh `
   jphack_front:v1
 ```
+### windowsの場合
+コンテナに入る(windows以外)
+```bash
+# 現在のディレクトリを取得
+$pwdPath = (Get-Location).Path
+
+# Windows パスを Docker 用パスに変換（例: C:\Users\Taiga → /c/Users/Taiga）
+$driveLetter = $pwdPath.Substring(0,1).ToLower()
+$pathWithoutDrive = $pwdPath.Substring(2) -replace '\\','/'
+$front = "/$driveLetter$pathWithoutDrive"  # ★←ここ修正（スラッシュを重ねない）
+
+Write-Host "Docker mount path: $front"
+
+# Docker コンテナ起動
+docker run --rm -it `
+  --name jphack_front `
+  -p 3000:3000 `
+  -v "${front}/frontend:/app" `
+  -v jphack_node_modules:/app/node_modules `
+  -e CHOKIDAR_USEPOLLING=true `
+  jphack_front:v1 `
+  sh -c "cd /app && npm run dev"
+
+```
+
+
 (3)モジュールのインストール
 ```bash
 npm install
