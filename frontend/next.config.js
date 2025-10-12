@@ -7,13 +7,16 @@ module.exports = {
   // 静的ファイルの配信設定
   async rewrites() {
     return [
+      // 観光ページ専用の CSS のみをアプリ内から配信
+      // その他の /css/* は public からそのまま配信（例: /css/stamp/*）
       {
-        source: '/css/:path*',
-        destination: '/app/sightseeing/css/:path*',
+        source: '/css/sightseeing/:path*',
+        destination: '/app/sightseeing/css/sightseeing/:path*',
       },
+      // 限定: sightseeing 用だけ /json/sightseeing/* をアプリ内の静的へ
       {
-        source: '/json/:path*',
-        destination: '/app/sightseeing/json/:path*',
+        source: '/json/sightseeing/:path*',
+        destination: '/app/sightseeing/json/sightseeing/:path*',
       },
       {
         source: '/pic/:path*',

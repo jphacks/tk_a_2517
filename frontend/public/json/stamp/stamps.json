@@ -1,0 +1,17 @@
+[
+  {
+    "id": "kinkakuji",
+    "image": "/img/kinkakuzi.jpg",
+    "text": "金閣寺の説明文です。"
+  },
+  {
+    "id": "ginkakuji",
+    "image": "/img/ginkakuzi.jpg",
+    "text": "銀閣寺の説明文です。"
+  },
+  {
+    "id": "kiyomizudera",
+    "image": "/img/kiyomizudera.jpg",
+    "text": "清水寺の説明文です。"
+  }
+]

@@ -33,7 +33,6 @@ docker run --rm -it `
 ### windowsの場合
 コンテナに入る(windows以外)
 ```bash
-<<<<<<< Updated upstream
 # 現在のディレクトリを取得
 $pwdPath = (Get-Location).Path
 
@@ -55,8 +54,7 @@ docker run --rm -it `
   sh -c "cd /app && npm run dev"
 
 =======
-docker run --rm -d --name jphack_front -p 3000:3000 -v "${PWD}/frontend:/app" -v jphack_node_modules:/app/node_modules -e CHOKIDAR_USEPOLLING=true jphack_front:v1
->>>>>>> Stashed changes
+
 ```
 
 
