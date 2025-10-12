@@ -1,0 +1,5 @@
+[
+  { "value": 1, "id": "kinkakuji", "title": "金閣寺（鹿苑寺）", "image": "/img/kinkakuzi.jpg", "text": "金箔の輝きと池に映る逆さ金閣が見どころ。豪華絢爛な京都の象徴。" },
+  { "value": 2, "id": "ginkakuji", "title": "銀閣寺（慈照寺）", "image": "/img/ginkakuzi.jpg", "text": "わびさびの美。静謐な庭園を歩きながら心を整える時間を。" },
+  { "value": 3, "id": "kiyomizudera", "title": "清水寺", "image": "/img/kiyomizudera.jpg", "text": "清水の舞台から望む景観は圧巻。活気ある参道も魅力。" }
+]
