@@ -1,94 +1,163 @@
-// app/visit/page.js
 'use client';
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { marked } from "marked";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+export default function SightseeingClient() {
+  const [data, setData] = useState(null);
 
-async function fetchJSON(url, init) {
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json', ...(init?.headers || {}) },
-    ...init,
-  });
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    const text = await res.text();
-    throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 120)}`);
-  }
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(`API error: ${JSON.stringify(data)}`);
-  }
-  return data;
-}
-
-export default function VisitPage() {
+  // Get URL query parameters (reactive to URL changes)
   const searchParams = useSearchParams();
-  const [all, setAll] = useState([]);
-  const [error, setError] = useState(null);
-  const [lastSaved, setLastSaved] = useState(null);
+  const rank = useMemo(() => {
+    const v = searchParams.get("rank");
+    const n = v !== null ? Number.parseInt(v, 10) : null;
+    return Number.isFinite(n) ? n : null;
+  }, [searchParams]);
+  const auto = useMemo(() => searchParams.get("auto") === "1", [searchParams]);
 
-  const refresh = useCallback(() => {
-    fetchJSON('/api/query-numbers')
-      .then((d) => {
-        setAll(Array.isArray(d.list) ? d.list : []);
-        setError(null);
-      })
-      .catch((e) => setError(e.message));
+  // Load the JSON
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const candidates = [
+        "/json/sightseeing/sightseeing.json",
+        "/json/sightseeing.json",
+      ];
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { cache: "no-store" });
+          if (res.ok) {
+            const j = await res.json();
+            if (!cancelled) setData(j);
+            return;
+          }
+        } catch {
+          // continue to the next candidate
+        }
+      }
+      if (!cancelled) setData({ locations: [] });
+    };
+    load();
+    return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    // 受け取るキー名は運用に合わせてここで調整。
-    // 例: /visit?n=123 や /visit?id=123 や /visit?query=123
-    const raw = searchParams.get('n') ?? searchParams.get('id') ?? searchParams.get('query');
-    const n = raw != null ? Number(raw) : NaN;
+  // rank -> id mapping
+  const targetId = useMemo(() => {
+    if (rank === 1) return "kinkakuji";
+    if (rank === 2) return "ginkakuji"; // not “ginkakuzi”
+    if (rank === 3) return "kiyomizudera";
+    return null;
+  }, [rank]);
 
-    if (Number.isFinite(n)) {
-      fetchJSON('/api/query-numbers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: n }),
-      })
-        .then((d) => {
-          setLastSaved(n);
-          setAll(Array.isArray(d.list) ? d.list : []);
-          setError(null);
-        })
-        .catch((e) => setError(e.message));
-    } else {
-      // 数値が来ていない場合でも現状の一覧は表示
-      refresh();
-    }
-  }, [searchParams, refresh]);
+  // find location by id
+  const targetLoc = useMemo(() => {
+    if (!targetId || !Array.isArray(data?.locations)) return null;
+    return data.locations.find((loc) => loc.id === targetId) ?? null;
+  }, [data, targetId]);
+
+  // pre-render markdown html
+  const targetHtml = useMemo(() => {
+    if (!targetLoc) return null;
+    const md = targetLoc.markdown_details
+      ?? `# ${targetLoc.name}\n\n${targetLoc.attributes?.benefit ?? ""}`;
+    return marked.parse(md);
+  }, [targetLoc]);
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>/visit — Query Number History</h1>
+    <div style={{ background: "#f5f1e8", minHeight: "100vh", padding:  " 24px 120px"}}>
+      {auto && targetLoc && (
+        <section className="detail-card">
+          <h2 className="detail-title">{targetLoc.name}</h2>
 
-      <section>
-        <p>
-          URL クエリで渡された数値を Cookie（JSON 配列）に累積保存します。
-          例: <code>/visit?n=123</code>, <code>/visit?id=45</code>, <code>/visit?query=9</code>
-        </p>
-        <p>直近に保存した値: {lastSaved ?? '(なし)'}</p>
-        <button onClick={refresh} style={{ marginTop: 8 }}>最新の履歴を取得</button>
-        {error && (
-          <p style={{ color: 'crimson', whiteSpace: 'pre-wrap' }}>エラー: {error}</p>
-        )}
-      </section>
+          {/* Side-by-side layout: left image, right description */}
+          <div className="detail-row">
+            <div className="detail-media">
+              {targetLoc.image ? (
+                <img
+                  src={targetLoc.image}
+                  alt={targetLoc.name}
+                  className="detail-img"
+                />
+              ) : (
+                <div className="detail-img placeholder" aria-hidden="true">No image</div>
+              )}
+            </div>
 
-      <section style={{ marginTop: 24 }}>
-        <h2>これまでに保存した番号（新しい順・重複排除）</h2>
-        {all.length === 0 ? (
-          <p>(まだ保存がありません)</p>
-        ) : (
-          <ol reversed>
-            {[...all].reverse().map((n, idx) => (
-              <li key={`${n}-${idx}`}><code>{n}</code></li>
-            ))}
-          </ol>
-        )}
-        <p>総件数: {all.length}</p>
-      </section>
-    </main>
+            <div
+              className="detail-body"
+              // If importing user-generated markdown, sanitize before injecting.
+              dangerouslySetInnerHTML={{ __html: targetHtml }}
+            />
+          </div>
+        </section>
+      )}
+
+      <style jsx>{`
+        .detail-card {
+          background: #fff;
+          padding: 16px;
+          border-radius: 12px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .detail-title {
+          margin: 0 0 12px 0;
+          color: #333;
+          font-size: 1.25rem;
+          line-height: 1.3;
+        }
+        .detail-row {
+          display: grid;
+          grid-template-columns: 320px 1fr; /* left fixed, right flexible */
+          gap: 24px; /* ← wider gap between image and text */
+          align-items: start;
+        }
+        .detail-media {
+          width: 100%;
+        }
+        .detail-img {
+          width: 100%;
+          height: 220px;
+          object-fit: cover;
+          border-radius: 10px;
+          display: block;
+          background: #f0efe9;
+        }
+        .detail-img.placeholder {
+          display: grid;
+          place-items: center;
+          color: #777;
+          font-size: 0.9rem;
+        }
+
+        /* ⬇️ Add generous left/right padding to the description area */
+        .detail-body {
+          padding-inline: clamp(24px, 4vw, 64px); /* 左右余白を拡大（可変） */
+          max-width: 70ch;                        /* 行幅を適度に制限して読みやすく */
+        }
+
+        .detail-body :global(h1),
+        .detail-body :global(h2),
+        .detail-body :global(h3) {
+          margin-top: 0.2em;
+        }
+        .detail-body :global(p) {
+          margin: 0.5em 0;
+        }
+
+        /* Responsive: stack on narrow screens */
+        @media (max-width: 720px) {
+          .detail-row {
+            grid-template-columns: 1fr;
+          }
+          .detail-img {
+            height: 200px;
+          }
+          .detail-body {
+            padding-inline: 16px; /* モバイルでは少し控えめに */
+            max-width: 100%;
+          }
+        }
+      `}</style>
+    </div>
   );
 }
