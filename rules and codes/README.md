@@ -11,7 +11,13 @@
 #ルートディレクトリを想定する。
 (1)イメージのビルド
 ```bash
+docker
 docker build -t jphack_front:v1 -f Docker/Dockerfile.frontend .
+```
+(1.1)作り直しの場合
+```bash
+docker stop jphack_front     
+docker rm jphack_front
 ```
 (2)コンテナに入る(windows以外)
 ```bash
@@ -27,13 +33,17 @@ docker run --rm -it `
 ### windowsの場合
 コンテナに入る(windows以外)
 ```bash
-# 現在のディレクトリを取得して Docker 用パスに変換
+# 現在のディレクトリを取得
 $pwdPath = (Get-Location).Path
-$front = '/' + $pwdPath.Replace(':','').Replace('\','/')
+
+# Windows パスを Docker 用パスに変換（例: C:\Users\Taiga → /c/Users/Taiga）
+$driveLetter = $pwdPath.Substring(0,1).ToLower()
+$pathWithoutDrive = $pwdPath.Substring(2) -replace '\\','/'
+$front = "/$driveLetter$pathWithoutDrive"  # ★←ここ修正（スラッシュを重ねない）
 
 Write-Host "Docker mount path: $front"
 
-$front = (Get-Location).Path -replace '\\','/'
+# Docker コンテナ起動
 docker run --rm -it `
   --name jphack_front `
   -p 3000:3000 `
@@ -41,7 +51,7 @@ docker run --rm -it `
   -v jphack_node_modules:/app/node_modules `
   -e CHOKIDAR_USEPOLLING=true `
   jphack_front:v1 `
-  sh -c 'cd /app && npm install && npm run dev'
+  sh -c "cd /app && npm run dev"
 
 ```
 

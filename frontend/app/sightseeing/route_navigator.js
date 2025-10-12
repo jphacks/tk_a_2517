@@ -1,4 +1,8 @@
-// 京都スタンプラリー - JavaScript版
+// 京都スタンプラリー - JavaScript版 (Legacy)
+// 注意: このファイルはレガシー（非 React）実装です。
+// 現在は JSX/React ベースの SightseeingClient.jsx が採用され、page.js から読み込まれます。
+// 互換性のために残していますが、新機能や修正は SightseeingClient.jsx 側に実装します。
+// 可能なら本ファイルの利用をやめ、`app/sightseeing/page.js` が描画する React 実装をご利用ください。
 export function generateStampRallyHTML() {
   // ブラウザ環境でのみ実行
   if (typeof window === 'undefined') {
@@ -10,22 +14,7 @@ export function generateStampRallyHTML() {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>京都スタンプラリー</title>
-  <link rel="stylesheet" href="./css/sightseeing/sightseeing.css">
-  <script>
-    // 管理画面のパターンを踏襲: socket.io クライアントを同一オリジンから優先的に読み込み、失敗時はCDNへフォールバック
-    (function(){
-      var s = document.createElement('script');
-      s.src = location.origin + '/socket.io/socket.io.js';
-      s.onload = function(){ try { window.__initSocket && window.__initSocket(); } catch(_){} };
-      s.onerror = function(){
-        var s2 = document.createElement('script');
-        s2.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
-        s2.onload = function(){ try { window.__initSocket && window.__initSocket(); } catch(_){} };
-        document.head.appendChild(s2);
-      };
-      document.head.appendChild(s);
-    })();
-  </script>
+  <link rel="stylesheet" href="/css/sightseeing/sightseeing.css">
 </head>
 <body>
   <div class="container">
@@ -33,8 +22,7 @@ export function generateStampRallyHTML() {
     <p>京都の名所を巡ってスタンプを集めよう！各観光地をクリックして詳細を確認できます。</p>
 
     <div class="controls" style="text-align:center;margin:20px 0">
-      <!-- File System Access controls will be injected by JS -->
-    </div>
+      </div>
 
     <div id="stampUI" class="stamp-container" style="display:none">
       <div class="stamp-title">STAMP GET!</div>
@@ -126,15 +114,19 @@ export function handleQueryParameters() {
 
 // スタンプラリーの初期化
 export function initializeStampRally() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
   
   let visitedStamps = new Set(); // 訪問済みスタンプを管理
   let allLocations = []; // 全観光地データ
   let qrScanner = null;
   let isScanning = false;
-  let backendDetected = false;
 
-  const el = id => document.getElementById(id);
+  const el = id => {
+    if (typeof document !== 'undefined') {
+      return document.getElementById(id);
+    }
+    return null;
+  };
 
   // データを外部JSONファイルから読み込み
   let data = null;
@@ -142,9 +134,7 @@ export function initializeStampRally() {
   // JSONデータを読み込む関数
   async function loadData() {
     try {
-      // 公開ディレクトリから読み込む（Next.jsのpublic配下）。
-      // 以前の相対パスだとルート解決に失敗するケースがあるため修正。
-      const response = await fetch('/json/sightseeing.json');
+      const response = await fetch('/json/sightseeing/sightseeing.json');
       if (!response.ok) {
         throw new Error('データの読み込みに失敗しました');
       }
@@ -159,133 +149,6 @@ export function initializeStampRally() {
     }
   }
 
-    // --- File System Access / import-export helpers ---
-    // ブラウザが File System Access API をサポートしているか
-    function supportsFSA() {
-      return typeof window !== 'undefined' && (
-        'showOpenFilePicker' in window || 'showSaveFilePicker' in window || 'showDirectoryPicker' in window
-      );
-    }
-
-    // 訪問済みスタンプをファイルに保存する
-    async function saveStampsToFile() {
-      try {
-        const payload = {
-          app: 'kyoto_stamp_rally',
-          version: 1,
-          timestamp: new Date().toISOString(),
-          visited: Array.from(visitedStamps),
-        };
-        const contents = JSON.stringify(payload, null, 2);
-
-        if (supportsFSA() && 'showSaveFilePicker' in window) {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: 'kyoto-stamps.json',
-            types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-            startIn: 'downloads'
-          });
-          const writable = await handle.createWritable();
-          await writable.write(contents);
-          await writable.close();
-        } else {
-          // フォールバック: ダウンロード
-          const blob = new Blob([contents], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'kyoto-stamps.json';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-        toastNotice('スタンプ進捗を保存しました');
-      } catch (e) {
-        console.error('saveStampsToFile error', e);
-        showError('スタンプの保存に失敗しました: ' + (e && e.message ? e.message : '不明なエラー'));
-      }
-    }
-
-    // ローカルJSONをインポートして観光地データに適用する
-    async function importSightseeingJSON() {
-      try {
-        if (supportsFSA() && 'showOpenFilePicker' in window) {
-          const [handle] = await window.showOpenFilePicker({
-            types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-            multiple: false,
-            excludeAcceptAllOption: true,
-            startIn: 'documents'
-          });
-          const file = await handle.getFile();
-          const text = await file.text();
-          const json = JSON.parse(text);
-          applyImportedData(json);
-        } else {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = 'application/json,.json';
-          input.onchange = async () => {
-            const f = input.files && input.files[0];
-            if (!f) return;
-            const text = await f.text();
-            const json = JSON.parse(text);
-            applyImportedData(json);
-          };
-          input.click();
-        }
-      } catch (e) {
-        console.error('importSightseeingJSON error', e);
-        showError('JSONの読み込みに失敗しました: ' + (e && e.message ? e.message : '不明なエラー'));
-      }
-    }
-
-    function applyImportedData(json) {
-      if (!json || !Array.isArray(json.locations)) {
-        showError('不正なデータ形式です。"locations" 配列を含むJSONを指定してください。');
-        return;
-      }
-      data = json;
-      visitedStamps.clear();
-      allLocations = data.locations || [];
-      renderStampUI();
-      updateStats();
-      toastNotice('観光地データを読み込みました');
-    }
-
-    function toastNotice(msg) {
-      const n = document.createElement('div');
-      n.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s;z-index:10002';
-      n.textContent = msg;
-      document.body.appendChild(n);
-      requestAnimationFrame(() => { n.style.opacity = '0.92'; });
-      setTimeout(() => { n.style.opacity = '0'; setTimeout(() => document.body.removeChild(n), 300); }, 1600);
-    }
-
-    function addControlsUI() {
-      const controls = document.querySelector('.controls');
-      if (!controls) return;
-      function mkButton(text) {
-        const b = document.createElement('button');
-        b.textContent = text;
-        b.style.cssText = 'margin:0 6px;padding:8px 12px;border-radius:8px;border:1px solid #d4c4a8;background:#f5f1e8;color:#8b4513;cursor:pointer;';
-        b.onmouseenter = () => b.style.background = '#efe6d1';
-        b.onmouseleave = () => b.style.background = '#f5f1e8';
-        return b;
-      }
-      const importBtn = mkButton('📂 ローカルJSONを読み込む');
-      importBtn.onclick = importSightseeingJSON;
-      const saveBtn = mkButton('💾 スタンプを保存');
-      saveBtn.onclick = saveStampsToFile;
-      controls.appendChild(importBtn);
-      controls.appendChild(saveBtn);
-      if (!supportsFSA()){
-        const note = document.createElement('div');
-        note.style.cssText = 'margin-top:8px;color:#8b7355;font-size:12px';
-        note.textContent = 'お使いのブラウザでは簡易保存・読み込み（ダウンロード/ファイル選択）で動作します。Chrome/Edge ではより便利に動作します。';
-        controls.appendChild(note);
-      }
-    }
-
   // スタンプラリーを開始
   function startStampRally() {
     allLocations = data.locations || [];
@@ -294,10 +157,13 @@ export function initializeStampRally() {
   }
   
   // グローバルスコープに公開
-  window.startStampRally = startStampRally;
+  if (typeof window !== 'undefined') {
+    window.startStampRally = startStampRally;
+  }
 
   // エラー表示
   function showError(message) {
+    if (typeof document === 'undefined') return;
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error';
     errorDiv.textContent = message;
@@ -331,6 +197,8 @@ export function initializeStampRally() {
 
   // スタンプスロットの作成: 未訪問は画像を最初から表示
   function createStampSlot(location, isVisited, index) {
+    if (typeof document === 'undefined') return null;
+    
     const slot = document.createElement('div');
     slot.className = `stamp-slot ${isVisited ? 'visited' : ''}`;
     slot.dataset.locationId = location.id;
@@ -374,6 +242,8 @@ export function initializeStampRally() {
 
   // プレースホルダースタンプスロットの作成
   function createPlaceholderSlot(index) {
+    if (typeof document === 'undefined') return null;
+    
     const slot = document.createElement('div');
     slot.className = 'stamp-slot placeholder';
     slot.dataset.index = index;
@@ -403,6 +273,8 @@ export function initializeStampRally() {
 
   // スタンプ獲得アニメーション
   function showStampGetAnimation(location) {
+    if (typeof document === 'undefined') return;
+    
     const notification = document.createElement('div');
     notification.style.cssText = `
       position: fixed;
@@ -443,8 +315,12 @@ export function initializeStampRally() {
     
     if (typeof setTimeout !== 'undefined') {
       setTimeout(() => {
-        document.body.removeChild(notification);
-        document.head.removeChild(style);
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+        if (document.head.contains(style)) {
+          document.head.removeChild(style);
+        }
       }, 2000);
     }
   }
@@ -546,20 +422,19 @@ export function initializeStampRally() {
   }
   
   // グローバルスコープに公開
-  window.onDataLoaded = onDataLoaded;
+  if (typeof window !== 'undefined') {
+    window.onDataLoaded = onDataLoaded;
+  }
 
   // QRコード生成とモーダル表示
   function showQrIntro(){
+    if (typeof document === 'undefined') return;
+    
     const modal = el('qrIntroModal');
     const canvas = document.getElementById('qrCanvas');
     
-    // 管理画面のパターンを踏襲し、検出済みバックエンドを優先
-    let currentUrl = 'http://localhost:3000/sightseeing';
-    if (typeof window !== 'undefined'){
-      const path = window.location.pathname + window.location.search + window.location.hash;
-      const base = window.__detectedBackend || (window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : ''));
-      currentUrl = base + path;
-    }
+    // 現在のURLをQRコードとして生成
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : 'http://localhost:3000/sightseeing';
     const qr = new QRious({ 
       element: canvas, 
       value: currentUrl, 
@@ -589,98 +464,13 @@ export function initializeStampRally() {
   }
   
   // グローバルスコープに公開
-  window.showQrIntro = showQrIntro;
-
-  //===============================
-  // バックエンド検出とsocket.io初期化（management.html準拠・簡易版）
-  //===============================
-  // 遅延エミット用キュー
-  let socket = null;
-  const emitQueue = [];
-  function queuedEmit(event, payload){
-    if (socket && socket.emit) return socket.emit(event, payload);
-    emitQueue.push({ event, payload });
+  if (typeof window !== 'undefined') {
+    window.showQrIntro = showQrIntro;
   }
-  function flushQueue(){
-    while(emitQueue.length && socket && socket.emit){
-      const it = emitQueue.shift();
-      socket.emit(it.event, it.payload);
-    }
-  }
-  Object.defineProperty(window, '__socket', {
-    configurable: true,
-    set(v){ socket = v; try{ window.io = window.io || v; }catch(e){} setTimeout(flushQueue, 0); },
-    get(){ return socket; }
-  });
-
-  // 候補バックエンドに対して疎通確認
-  async function tryBackends(path, options){
-    if (typeof window === 'undefined') throw new Error('no-window');
-    const proto = location.protocol;
-    const host = location.hostname;
-    const ports = ['', '3002','3001','3000'];
-    if (location.port && !ports.includes(location.port)) ports.push(location.port);
-
-    if (window.__detectedBackend){
-      try{
-        const r = await fetch(window.__detectedBackend + path, options);
-        if (r.status !== 404) return r;
-      }catch(_){ /* 継続 */ }
-    }
-    for (const p of ports){
-      const base = proto + '//' + host + (p ? ':'+p : '');
-      try{
-        const r = await fetch(base + path, options);
-        if (r.status === 404) continue;
-        window.__detectedBackend = base;
-        backendDetected = true;
-        return r;
-      }catch(_){ continue; }
-    }
-    throw new Error('all backends failed');
-  }
-
-  // socket.ioクライアントの初期化（同一オリジン優先、CDNフォールバックはheadのスクリプトで実施）
-  window.__initSocket = function initSocket(){
-    if (typeof io === 'undefined') return;
-    const host = location.hostname;
-    const proto = location.protocol;
-    const ordered = ['3002','3001','3000'];
-    if (location.port && !ordered.includes(location.port)) ordered.push(location.port);
-    (async function tryConnect(){
-      for (const p of ordered){
-        const url = proto + '//' + host + (p ? ':' + p : '');
-        let s = null;
-        try{
-          s = io(url, { transports: ['polling','websocket'], timeout: 2000 });
-          await new Promise((resolve, reject) => {
-            const onConnect = () => { s.off('connect_error', onError); resolve('ok'); };
-            const onError = (err) => { s.off('connect', onConnect); reject(err); };
-            s.once('connect', onConnect);
-            s.once('connect_error', onError);
-          });
-          window.__socket = s;
-          window.__detectedBackend = url;
-          backendDetected = true;
-          break;
-        }catch(e){ try{ s && s.close && s.close(); }catch(_){} }
-      }
-    })();
-  };
-
-  // 可能ならバックエンドを事前検出（/health もしくは MCP fetch）
-  (async function detectBackend(){
-    try{
-      const r = await tryBackends('/health', { method: 'GET' });
-      await r.json().catch(()=>({}));
-    }catch(_){
-      try{ await tryBackends('/mcp/fetch?url=' + encodeURIComponent('https://example.com') + '&apiKey=devkey123', { method: 'GET' }); }catch(__){}
-    }
-  })();
 
   // QRコードスキャン機能
   function startQRScanning() {
-    if (isScanning) return;
+    if (isScanning || typeof document === 'undefined') return;
     
     const modal = el('qrIntroModal');
     const canvas = document.getElementById('qrCanvas');
@@ -737,7 +527,9 @@ export function initializeStampRally() {
   }
   
   // グローバルスコープに公開
-  window.startQRScanning = startQRScanning;
+  if (typeof window !== 'undefined') {
+    window.startQRScanning = startQRScanning;
+  }
 
   // QRコード検出時の処理
   function handleQRCodeDetected(decodedText) {
@@ -769,6 +561,8 @@ export function initializeStampRally() {
 
   // QRスキャン成功の表示
   function showQRSuccess() {
+    if (typeof document === 'undefined') return;
+    
     const scannerDiv = document.getElementById('qrScanner');
     if (scannerDiv) {
       scannerDiv.innerHTML = `
@@ -783,6 +577,8 @@ export function initializeStampRally() {
 
   // QRスキャン無効の表示
   function showQRInvalid() {
+    if (typeof document === 'undefined') return;
+    
     const scannerDiv = document.getElementById('qrScanner');
     if (scannerDiv) {
       scannerDiv.innerHTML = `
@@ -803,6 +599,8 @@ export function initializeStampRally() {
 
   // QRスキャンエラーの表示
   function showQRScanError() {
+    if (typeof document === 'undefined') return;
+    
     const scannerDiv = document.getElementById('qrScanner');
     if (scannerDiv) {
       scannerDiv.innerHTML = `
@@ -817,6 +615,8 @@ export function initializeStampRally() {
 
   // QRスキャンボタンを追加
   function addQRScanButton() {
+    if (typeof document === 'undefined') return;
+    
     const modal = el('qrIntroModal');
     const buttonContainer = modal.querySelector('div[style*="margin-top:20px"]');
     
@@ -833,8 +633,6 @@ export function initializeStampRally() {
   onDataLoaded();
   showQrIntro();
   addQRScanButton();
-  // ファイル入出力ボタンを追加
-  try { addControlsUI(); } catch(e) { /* 保険: 失敗してもアプリ本体は動く */ }
 }
 
 // デフォルトエクスポート
