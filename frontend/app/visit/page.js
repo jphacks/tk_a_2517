@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import styles from '../stamp/stamp.module.css';
 import AcquiredPopup from '../stamp/AcquiredPopup';
 import { loadSightseeing, numbersToVisited, loadItemByIdAndLevel } from '../stamp/stampUtils';
@@ -38,7 +37,6 @@ function getParamIdOrIndex(locations) {
 }
 
 export default function VisitPage() {
-  const router = useRouter();
   const [data, setData] = useState(null);
   const [visited, setVisited] = useState(() => new Set());
   const [lastId, setLastId] = useState(null);
@@ -113,12 +111,10 @@ export default function VisitPage() {
                   style={{ position: 'relative', cursor: 'pointer' }}
                   onClick={() => {
                     if (isVisited) {
-                      // 開いたままポップアップ（スタンプ説明機構）
+                      // 獲得済みのみポップアップを開く
                       setPopupId(loc.id);
-                    } else {
-                      // 未獲得は従来通りスタンプへ誘導してもOK
-                      router.push(`/stamp?id=${loc.id}&difficulty=medium&auto=1`);
                     }
+                    // 未獲得は何もしない（クリック入手の機構を廃止）
                   }}
                   role="button"
                   aria-label={`${loc.name} を開く`}

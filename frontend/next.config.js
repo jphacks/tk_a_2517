@@ -4,8 +4,6 @@ module.exports = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Vercel向けの設定
-  output: 'standalone',
   // 静的ファイルの配信設定
   async rewrites() {
     return [
@@ -33,28 +31,31 @@ module.exports = {
   },
   // 開発環境でのコンソール警告を抑制
   webpack: (config, { dev, isServer }) => {
-    // ブラウザ向けバンドルでは Node コアを無効化
-    if (!isServer) {
-      if (dev) {
-        config.resolve.fallback = {
-          ...config.resolve.fallback,
-          fs: false,
-          net: false,
-          tls: false,
-          crypto: false,
-          stream: false,
-          util: false,
-          buffer: false,
-          process: false,
-        };
-      }
-      config.resolve.alias = {
-        ...config.resolve.alias,
+    if (dev && !isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
         fs: false,
-        path: false,
+        net: false,
+        tls: false,
+        crypto: false,
+        stream: false,
+        util: false,
+        buffer: false,
+        process: false,
       };
     }
+    
+    // ファイルシステムアクセスを完全に無効化
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      fs: false,
+      path: false,
+    };
+    
     return config;
   },
-  // experimental 設定は使用しない（Vercel推奨）
+  // 開発環境での警告を抑制
+  experimental: {
+    esmExternals: false,
+  },
 };

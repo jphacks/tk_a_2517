@@ -50,7 +50,7 @@ export default function Home() {
 
   return (
     <div className="container">
-      <h1>🤖 QRally - Robot Management System</h1>
+      <h1>🏭 QRally Factory - Robot Management System</h1>
       
       <div className="card">
         <h2>Individual Robot QR Codes</h2>
@@ -146,6 +146,20 @@ export default function Home() {
               fontSize: '16px'
             }}>
               🚨 工場責任者ダッシュボード
+            </div>
+          </Link>
+          <Link href="/improvement-verification">
+            <div style={{ 
+              display: 'inline-block',
+              padding: '12px 24px', 
+              backgroundColor: '#f59e0b', 
+              color: 'white', 
+              borderRadius: '8px', 
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '16px'
+            }}>
+              🔍 改良確認
             </div>
           </Link>
         </div>

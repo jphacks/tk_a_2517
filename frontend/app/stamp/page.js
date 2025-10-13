@@ -52,7 +52,6 @@ export default function KyotoStampRallyPage() {
   const bootOnceRef = useRef(false);
   const [acquiredId, setAcquiredId] = useState(null); // 左側に表示する獲得画像のID
   const [showInlineAcquiredView, setShowInlineAcquiredView] = useState(false); // モーダルを閉じた後の同一ページ表示
-  const analysisOnceRef = useRef(false); // 画像解析と保存を一度だけ実行
 
   // データ読み込み
   async function loadSample() {
@@ -127,59 +126,6 @@ export default function KyotoStampRallyPage() {
       setShowInlineAcquiredView(true);
     }, 2000);
   }, [showUI, data, difficulty]);
-
-  // 獲得ビューが表示されたら、画像ベースの検索→RAG→メモリ保存を自動実行（1回だけ）
-  useEffect(() => {
-    (async () => {
-      if (!showInlineAcquiredView || !currentItem || analysisOnceRef.current) return;
-      analysisOnceRef.current = true;
-      try {
-        const imageUrl = currentItem.image;
-        // 1) 画像ハッシュでスポット推定
-        const isRes = await fetchJSON('/api/image-search', {
-          method: 'POST',
-          body: JSON.stringify({ imageUrl }),
-        });
-        const matchedSpot = isRes?.match?.spot_id || acquiredId || null;
-
-        // 2) RAG的な要約を取得（spot_id ベース）
-        let summary = '';
-        let nearby = [];
-        if (matchedSpot) {
-          try {
-            const rag = await fetchJSON('/api/rag-query', {
-              method: 'POST',
-              body: JSON.stringify({ spot_id: matchedSpot, userLang: (typeof navigator !== 'undefined' ? (navigator.language||'ja').slice(0,2) : 'ja') }),
-            });
-            summary = rag?.message || '';
-            nearby = Array.isArray(rag?.nearby) ? rag.nearby : [];
-          } catch {}
-        }
-
-        // 3) メモリ保存（app/memory/logs/ に JSON 出力）
-        try {
-          await fetchJSON('/api/memory/save', {
-            method: 'POST',
-            body: JSON.stringify({
-              spot_id: matchedSpot,
-              image: imageUrl,
-              matched: isRes?.match || null,
-              targetHash: isRes?.targetHash || null,
-              summary,
-              nearby,
-              difficulty,
-              source: 'stamp',
-              path: (typeof window !== 'undefined') ? window.location.pathname + window.location.search : '/stamp',
-              ts: Date.now(),
-            }),
-          });
-        } catch {}
-      } catch (e) {
-        // 解析失敗はUIに影響させない
-        console.warn('auto-analyze failed:', e?.message);
-      }
-    })();
-  }, [showInlineAcquiredView, currentItem, difficulty, acquiredId]);
 
   // スタンプラリー開始
   function startStampRally(d = data) {

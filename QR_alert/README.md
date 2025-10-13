@@ -15,17 +15,25 @@ A Next.js-based QR code alert system that displays robot diagnostics with Three.
 ### Using Docker (Recommended)
 
 ```bash
-# Build the Docker image
+# カレントディレクトリを Docker 用の /c/... 形式に変換
+$pwdPath = (Get-Location).Path
+$driveLetter = $pwdPath.Substring(0,1).ToLower()
+$pathWithoutDrive = $pwdPath.Substring(2) -replace '\\','/'
+$front = "/$driveLetter$pathWithoutDrive"
+Write-Host "Docker mount path: $front"
+
+# Build
 docker build -t qr_alert:v1 -f QR_alert/Dockerfile .
 
-# Run the container
-docker run --rm -it \
-  --name qr_alert \
-  -p 5000:5000 \
-  -v "${PWD}/QR_alert:/app" \
-  -v qr_alert_node_modules:/app/node_modules \
-  -e CHOKIDAR_USEPOLLING=true \
-  qr_alert:v1
+# Run (PowerShell の行継続はバッククォート ` を行末に置くこと)
+docker run --rm -it `
+  --name qr_alert `
+  -p 5000:5000 `
+  -v "$front/QR_alert:/app" `
+  -v qr_alert_node_modules:/app/node_modules `
+  -e CHOKIDAR_USEPOLLING=true `
+  qr_alert:v1 `
+  sh -c "cd /app && npm run dev"
 ```
 
 ### Local Development
@@ -61,3 +69,9 @@ The service will be available at `http://localhost:5000`
 ## Integration
 
 This service runs on port 5000 and can be integrated with your existing Docker setup alongside the frontend service (port 3000).
+
+## PowerShell users
+
+If you're on Windows using PowerShell, see `README_POWERSHELL.md` for PowerShell-specific Docker commands and tips.
+
+日本語の手順は `README.ja.md` を参照してください。

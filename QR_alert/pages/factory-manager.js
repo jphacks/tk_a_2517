@@ -105,7 +105,7 @@ export default function FactoryManagerDashboard() {
         {/* ヘッダー */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h1 style={{ margin: 0, color: '#ff4444' }}>🚨 QRally 工場責任者ダッシュボード</h1>
+            <h1 style={{ margin: 0, color: '#ff4444' }}>🚨 QRally Factory 責任者ダッシュボード</h1>
             <button 
               onClick={() => router.push('/')}
               style={{ 

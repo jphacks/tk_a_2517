@@ -109,12 +109,28 @@ export class RobotDiagnosticAI {
       this.name = 'RobotDiagnosticAI';
       this.version = '1.0.0';
       this.capabilities = ['temperature_analysis', 'vibration_analysis'];
+      // デフォルト閾値と平滑化幅
+      this.smoothingWindow = 5;
+      this.thresholds = {
+        temperature: { critical: 60, warning: 50, low: 45 },
+        vibration: { critical: 0.4, warning: 0.3 },
+        humidity: { critical: 80, warning: 70 },
+        operatingHours: { critical: 10000, warning: 5000 }
+      };
       return;
     }
     
     this.name = aiConfig.aiAgent.name;
     this.version = aiConfig.aiAgent.version;
     this.capabilities = aiConfig.aiAgent.capabilities;
+    // 平滑化ウィンドウ（履歴のサンプル数）と閾値を設定（設定ファイルにあれば上書き）
+    this.smoothingWindow = aiConfig?.smoothingWindow || 5;
+    this.thresholds = aiConfig?.thresholds || {
+      temperature: { critical: 60, warning: 50, low: 45 },
+      vibration: { critical: 0.4, warning: 0.3 },
+      humidity: { critical: 80, warning: 70 },
+      operatingHours: { critical: 10000, warning: 5000 }
+    };
   }
 
   // 温度分析
@@ -131,28 +147,45 @@ export class RobotDiagnosticAI {
       confidence: 0.8
     };
 
-    // 温度パターン分析
-    if (temperature > 60) {
+    // 平滑化（履歴 + 現在値）を使ってノイズを低減
+    const temps = (historicalData || []).map(h => Number(h.temperature)).filter(v => !isNaN(v));
+    temps.push(Number(temperature));
+    const window = Math.max(1, this.smoothingWindow);
+    const recent = temps.slice(-window);
+    const avgTemp = recent.reduce((a, b) => a + b, 0) / recent.length;
+    analysis.avgTemperature = avgTemp;
+    analysis.recentTemperatures = recent;
+
+    // 温度パターン分析（平均値ベース）
+    if (avgTemp > this.thresholds.temperature.critical) {
       analysis.pattern = 'sudden_spike';
       analysis.severity = 'critical';
       analysis.causes = partAnalysis?.temperature_causes || aiConfig?.temperatureAnalysis?.patterns?.sudden_spike?.causes || ['冷却システムの故障'];
       analysis.recommendations = aiConfig?.temperatureAnalysis?.patterns?.sudden_spike?.recommendations || ['緊急点検の実施'];
       analysis.aiResponse = this.generateAIResponse('temperature_spike_analysis', 'critical');
       analysis.confidence = 0.95;
-    } else if (temperature > 50) {
+    } else if (avgTemp > this.thresholds.temperature.warning) {
       analysis.pattern = 'gradual_increase';
       analysis.severity = 'warning';
       analysis.causes = partAnalysis?.temperature_causes || aiConfig?.temperatureAnalysis?.patterns?.gradual_increase?.causes || ['温度上昇'];
       analysis.recommendations = aiConfig?.temperatureAnalysis?.patterns?.gradual_increase?.recommendations || ['点検の実施'];
       analysis.aiResponse = this.generateAIResponse('temperature_spike_analysis', 'warning');
       analysis.confidence = 0.85;
-    } else if (temperature > 45) {
+    } else if (avgTemp > this.thresholds.temperature.low) {
       analysis.pattern = 'intermittent_high';
       analysis.severity = 'low';
-      analysis.causes = partAnalysis?.temperature_causes || aiConfig.temperatureAnalysis.patterns.intermittent_high.causes;
-      analysis.recommendations = aiConfig.temperatureAnalysis.patterns.intermittent_high.recommendations;
+      analysis.causes = partAnalysis?.temperature_causes || aiConfig?.temperatureAnalysis?.patterns?.intermittent_high?.causes || [];
+      analysis.recommendations = aiConfig?.temperatureAnalysis?.patterns?.intermittent_high?.recommendations || [];
       analysis.aiResponse = this.generateAIResponse('temperature_spike_analysis', 'low');
       analysis.confidence = 0.75;
+    }
+
+    // 現在値が平均から大きく外れている場合は信頼度を若干下げる（突発値の影響を抑制）
+    const diff = Math.abs(Number(temperature) - avgTemp);
+    if (diff > 10) {
+      analysis.confidence = Math.max(0.5, analysis.confidence - 0.15);
+    } else if (diff > 5) {
+      analysis.confidence = Math.max(0.6, analysis.confidence - 0.05);
     }
 
     return analysis;
@@ -161,7 +194,7 @@ export class RobotDiagnosticAI {
   // 振動分析
   analyzeVibration(partData, historicalData = []) {
     const { vibration, partId, partName } = partData;
-    const partAnalysis = aiConfig.partSpecificAnalysis[partId];
+    const partAnalysis = aiConfig.partSpecificAnalysis?.[partId];
     
     let analysis = {
       pattern: 'normal',
@@ -172,20 +205,33 @@ export class RobotDiagnosticAI {
       confidence: 0.8
     };
 
-    if (vibration > 0.4) {
+    // 平滑化
+    const vibs = (historicalData || []).map(h => Number(h.vibration)).filter(v => !isNaN(v));
+    vibs.push(Number(vibration));
+    const vRecent = vibs.slice(-Math.max(1, this.smoothingWindow));
+    const avgVib = vRecent.reduce((a, b) => a + b, 0) / vRecent.length;
+    analysis.avgVibration = avgVib;
+    analysis.recentVibrations = vRecent;
+
+    if (avgVib > this.thresholds.vibration.critical) {
       analysis.pattern = 'high_frequency';
       analysis.severity = 'critical';
-      analysis.causes = partAnalysis?.vibration_causes || aiConfig.vibrationAnalysis.patterns.high_frequency.causes;
-      analysis.recommendations = aiConfig.vibrationAnalysis.patterns.high_frequency.recommendations;
+      analysis.causes = partAnalysis?.vibration_causes || aiConfig?.vibrationAnalysis?.patterns?.high_frequency?.causes || [];
+      analysis.recommendations = aiConfig?.vibrationAnalysis?.patterns?.high_frequency?.recommendations || [];
       analysis.aiResponse = this.generateAIResponse('vibration_analysis', 'critical');
       analysis.confidence = 0.9;
-    } else if (vibration > 0.3) {
+    } else if (avgVib > this.thresholds.vibration.warning) {
       analysis.pattern = 'low_frequency';
       analysis.severity = 'warning';
-      analysis.causes = partAnalysis?.vibration_causes || aiConfig.vibrationAnalysis.patterns.low_frequency.causes;
-      analysis.recommendations = aiConfig.vibrationAnalysis.patterns.low_frequency.recommendations;
+      analysis.causes = partAnalysis?.vibration_causes || aiConfig?.vibrationAnalysis?.patterns?.low_frequency?.causes || [];
+      analysis.recommendations = aiConfig?.vibrationAnalysis?.patterns?.low_frequency?.recommendations || [];
       analysis.aiResponse = this.generateAIResponse('vibration_analysis', 'warning');
       analysis.confidence = 0.8;
+    }
+
+    const vDiff = Math.abs(Number(vibration) - avgVib);
+    if (vDiff > 0.2) {
+      analysis.confidence = Math.max(0.5, analysis.confidence - 0.15);
     }
 
     return analysis;
@@ -204,20 +250,32 @@ export class RobotDiagnosticAI {
       confidence: 0.8
     };
 
-    if (humidity > 80) {
+    const hums = (historicalData || []).map(h => Number(h.humidity)).filter(v => !isNaN(v));
+    hums.push(Number(humidity));
+    const hRecent = hums.slice(-Math.max(1, this.smoothingWindow));
+    const avgHum = hRecent.reduce((a, b) => a + b, 0) / hRecent.length;
+    analysis.avgHumidity = avgHum;
+    analysis.recentHumidities = hRecent;
+
+    if (avgHum > this.thresholds.humidity.critical) {
       analysis.pattern = 'high_humidity';
       analysis.severity = 'critical';
       analysis.causes = aiConfig?.humidityAnalysis?.patterns?.high_humidity?.causes || ['湿度センサーの異常', '密閉性の低下'];
       analysis.recommendations = aiConfig?.humidityAnalysis?.patterns?.high_humidity?.recommendations || ['湿度制御システムの点検'];
       analysis.aiResponse = this.generateAIResponse('humidity_analysis', 'critical');
       analysis.confidence = 0.9;
-    } else if (humidity > 70) {
+    } else if (avgHum > this.thresholds.humidity.warning) {
       analysis.pattern = 'condensation';
       analysis.severity = 'warning';
       analysis.causes = aiConfig?.humidityAnalysis?.patterns?.condensation?.causes || ['温度差による結露'];
       analysis.recommendations = aiConfig?.humidityAnalysis?.patterns?.condensation?.recommendations || ['温度差の調整'];
       analysis.aiResponse = this.generateAIResponse('humidity_analysis', 'warning');
       analysis.confidence = 0.8;
+    }
+
+    const hDiff = Math.abs(Number(humidity) - avgHum);
+    if (hDiff > 20) {
+      analysis.confidence = Math.max(0.5, analysis.confidence - 0.15);
     }
 
     return analysis;
@@ -236,20 +294,32 @@ export class RobotDiagnosticAI {
       confidence: 0.8
     };
 
-    if (operatingHours > 10000) {
+    const ops = (historicalData || []).map(h => Number(h.operatingHours)).filter(v => !isNaN(v));
+    ops.push(Number(operatingHours));
+    const oRecent = ops.slice(-Math.max(1, this.smoothingWindow));
+    const avgOps = oRecent.reduce((a, b) => a + b, 0) / oRecent.length;
+    analysis.avgOperatingHours = avgOps;
+    analysis.recentOperatingHours = oRecent;
+
+    if (avgOps > this.thresholds.operatingHours.critical) {
       analysis.pattern = 'material_fatigue';
       analysis.severity = 'critical';
       analysis.causes = aiConfig?.fatigueAnalysis?.patterns?.material_fatigue?.causes || ['長期運転による疲労', '材料の劣化'];
       analysis.recommendations = aiConfig?.fatigueAnalysis?.patterns?.material_fatigue?.recommendations || ['部品の交換'];
       analysis.aiResponse = this.generateAIResponse('fatigue_analysis', 'critical');
       analysis.confidence = 0.9;
-    } else if (operatingHours > 5000) {
+    } else if (avgOps > this.thresholds.operatingHours.warning) {
       analysis.pattern = 'mechanical_wear';
       analysis.severity = 'warning';
       analysis.causes = aiConfig?.fatigueAnalysis?.patterns?.mechanical_wear?.causes || ['ベアリングの摩耗', 'ギアの損傷'];
       analysis.recommendations = aiConfig?.fatigueAnalysis?.patterns?.mechanical_wear?.recommendations || ['ベアリングの交換'];
       analysis.aiResponse = this.generateAIResponse('fatigue_analysis', 'warning');
       analysis.confidence = 0.8;
+    }
+
+    const oDiff = Math.abs(Number(operatingHours) - avgOps);
+    if (oDiff > 1000) {
+      analysis.confidence = Math.max(0.5, analysis.confidence - 0.15);
     }
 
     return analysis;

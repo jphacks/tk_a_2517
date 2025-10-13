@@ -15,6 +15,8 @@ class BackgroundMonitor {
     this.aiAgent = new RobotDiagnosticAI();
     this.reportsDir = path.join(process.cwd(), 'reports');
     this.lastReportTimes = {}; // 重複レポート防止用
+    // 部位ごとの履歴バッファ（各ロボットID -> partId -> [{temperature,vibration,humidity,operatingHours,timestamp}, ...]）
+    this.historyBuffer = {};
     
     // reportsディレクトリが存在しない場合は作成
     if (fs && !fs.existsSync(this.reportsDir)) {
@@ -28,6 +30,29 @@ class BackgroundMonitor {
     
     this.isRunning = true;
     console.log('🏭 工場監視システム: バックグラウンド監視を開始しました');
+    // 起動時に reports フォルダを完全削除して古いファイル/プロセス遺留をクリア
+    try {
+      if (fs && fs.existsSync(this.reportsDir)) {
+        const entries = fs.readdirSync(this.reportsDir);
+        entries.forEach(entry => {
+          const full = path.join(this.reportsDir, entry);
+          try {
+            const stat = fs.statSync(full);
+            if (stat.isDirectory()) {
+              // ディレクトリは再帰削除
+              fs.rmdirSync(full, { recursive: true });
+            } else {
+              fs.unlinkSync(full);
+            }
+          } catch (e) {
+            console.error('reports フォルダ内ファイル削除中にエラー:', e);
+          }
+        });
+        console.log('🧹 reports ディレクトリをクリーンアップしました');
+      }
+    } catch (err) {
+      console.error('reports ディレクトリのクリーンアップに失敗:', err);
+    }
     
     // 5秒ごとに監視（工場環境での実用的な間隔）
     this.monitoringInterval = setInterval(() => {
@@ -138,6 +163,22 @@ class BackgroundMonitor {
       };
     });
 
+    // 履歴バッファに追加
+    if (!this.historyBuffer[robotId]) this.historyBuffer[robotId] = {};
+    parts.forEach(p => {
+      if (!this.historyBuffer[robotId][p.id]) this.historyBuffer[robotId][p.id] = [];
+      this.historyBuffer[robotId][p.id].push({
+        temperature: p.temperature,
+        vibration: p.vibration,
+        humidity: p.humidity,
+        operatingHours: p.operatingHours,
+        timestamp: p.lastUpdate
+      });
+      // 直近の履歴のみ保持（最大10件）
+      if (this.historyBuffer[robotId][p.id].length > 10) {
+        this.historyBuffer[robotId][p.id] = this.historyBuffer[robotId][p.id].slice(-10);
+      }
+    });
     return {
       robotId,
       robotName: `Robot ${robotId}`,
@@ -148,8 +189,11 @@ class BackgroundMonitor {
 
   // 緊急レポート生成
   async generateEmergencyReport(robotId, robotData, criticalParts) {
-    const timestamp = new Date();
-    const reportKey = `${robotId}_${timestamp.toISOString().split('T')[0]}`;
+  // レポート生成時刻を日本時間基準で扱う
+  const now = new Date();
+  const jpOptions = { timeZone: 'Asia/Tokyo' };
+  const timestamp = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+  const reportKey = `${robotId}_${timestamp.toISOString().split('T')[0]}`;
     
     // 同じ日のレポートが既に生成されている場合はスキップ
     if (this.lastReportTimes[reportKey]) {
@@ -175,7 +219,9 @@ class BackgroundMonitor {
     
     // レポートファイル名を生成
     const reportType = isCritical ? 'CRITICAL' : 'emergency';
-    const filename = `${reportType}_report_${robotId}_${timestamp.toISOString().replace(/[:.]/g, '-')}.txt`;
+  // ファイル名はタイムスタンプを日本時間に整形して使用
+  const isoForFilename = timestamp.toISOString().replace(/[:.]/g, '-');
+  const filename = `${reportType}_report_${robotId}_${isoForFilename}.txt`;
     const filePath = path.join(this.reportsDir, filename);
     
     // レポート内容を生成
@@ -216,8 +262,9 @@ class BackgroundMonitor {
         vibration: part.vibration,
         status: part.status
       };
-      
-      const analysis = this.aiAgent.generateComprehensiveAnalysis(partData);
+      // 履歴データを取得してAIへ渡す（なければ空配列）
+      const historicalData = (this.historyBuffer?.[robotData.robotId]?.[part.id]) || [];
+      const analysis = this.aiAgent.generateComprehensiveAnalysis(partData, historicalData);
       analysisResults.push(analysis);
     }
     
@@ -226,8 +273,9 @@ class BackgroundMonitor {
 
   // レポート内容生成
   generateReportContent(robotData, criticalParts, aiAnalysis, timestamp, isCritical = false) {
-    const containerTime = timestamp.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
-    const isoTime = timestamp.toISOString();
+  // レポート内で表示する時刻は常に日本時間
+  const containerTime = timestamp.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+  const isoTime = timestamp.toISOString();
     
     let content = '';
     content += '='.repeat(80) + '\n';

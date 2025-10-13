@@ -166,7 +166,7 @@ export default function FactoryMonitor() {
         {/* ヘッダー */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h1 style={{ margin: 0, color: '#ff8800' }}>🏭 QRally 工場監視システム</h1>
+            <h1 style={{ margin: 0, color: '#ff8800' }}>🏭 QRally Factory 監視システム</h1>
             <button 
               onClick={() => router.push('/')}
               style={{ 

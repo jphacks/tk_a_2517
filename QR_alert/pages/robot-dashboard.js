@@ -153,7 +153,7 @@ export default function RobotDashboard() {
         {/* メインロボット表示エリア */}
         <div style={{ flex: '1 1 600px' }} className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2>🤖 QRally Robot Dashboard: {id}</h2>
+            <h2>🏭 QRally Factory Robot Dashboard: {id}</h2>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 className="btn" 
