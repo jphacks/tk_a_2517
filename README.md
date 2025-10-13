@@ -11,7 +11,7 @@ QRally - 工場向け
 URL: https://drive.google.com/file/d/108BlEQ4uQvlJkwKN-5HXvTHWnOiRlsao/view?resourcekey
 
 ## 詳細資料
-Powerpoint: ![](./docs/materials/tka_2517 JPHacks Award day用.pdf)
+Powerpoint: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20Award%20day用.pdf)
 
 
 ## 製品概要
