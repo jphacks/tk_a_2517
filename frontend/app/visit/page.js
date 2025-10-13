@@ -3,6 +3,9 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import styles from '../stamp/stamp.module.css';
+import { getUserId, getPointsForUser, assignSequentialId, resetSessionId, createOneTimeToken } from '../lib/userClient';
+import { getPointsPerStamp } from '../lib/pointsConfig';
+import { useRouter } from 'next/navigation';
 import AcquiredPopup from '../stamp/AcquiredPopup';
 import { loadSightseeing, numbersToVisited, loadItemByIdAndLevel } from '../stamp/stampUtils';
 
@@ -78,27 +81,62 @@ export default function VisitPage() {
   const allLocations = useMemo(() => data?.locations || [], [data]);
   const collectedCount = visited.size;
   const totalCount = allLocations.length;
-  const points = collectedCount * 2;
+  // prefer per-user persisted temporary points
+  const [userPoints, setUserPoints] = useState(null);
+  const [userIdLocal, setUserIdLocal] = useState(null);
+  const [otpToken, setOtpToken] = useState(null);
+  const [showReloadModal, setShowReloadModal] = useState(false);
+  const router = useRouter();
   const rewardIcon = '/img/visit/kinkakuzi_reward.jpg';
 
   const locationsToShow = allLocations.slice(0, 6);
   const remainingSlots = Math.max(0, 6 - locationsToShow.length);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const assigned = await assignSequentialId();
+        const id = getUserId();
+        setUserIdLocal(id || assigned);
+        const p = getPointsForUser(id || assigned);
+        setUserPoints(p);
+      } catch (e) {
+        try { const id = getUserId(); setUserIdLocal(id); setUserPoints(getPointsForUser(id)); } catch (e2) {}
+      }
+    })();
+  }, []);
+
+  // Display points should reflect either stored user points or baseline from stamps
+  const baselinePerStamp = getPointsPerStamp();
+  const displayPoints = Math.max((userPoints ?? 0), collectedCount * baselinePerStamp);
+
   return (
     <div className={styles.pageRoot}>
       <div className={styles.container}>
         <h1>QRally 保有スタンプ</h1>
-        <div style={{ display: 'flex', gap: 32, marginBottom: 16, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 32, marginBottom: 16, alignItems: 'center' }}>
           <div>スタンプ保有数：{collectedCount}個</div>
-          <div>所持ポイント数：{points}p</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Reward:</span>
-            <img src={rewardIcon} alt="reward" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
-          </div>
+            <div>所持ポイント数：{displayPoints}p</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Reward:</span>
+              <img src={rewardIcon} alt="reward" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+            </div>
+            {/* Blue oval: ポイント確認 -> navigate to prize */}
+            <div style={{ marginLeft: 'auto' }}>
+              <button onClick={() => router.push('/prize')} style={{ background: '#e7f0ff', border: '2px solid #4a90e2', padding: '8px 12px', borderRadius: 20 }}>ポイント確認</button>
+            </div>
         </div>
         {error && <div className={styles.error}>{error}</div>}
 
         <div className={styles.stampContainer}>
+          <div style={{ position: 'absolute', right: 24, top: 24 }}>
+            <button onClick={async () => {
+              // create one-time token and show reload modal
+              const t = createOneTimeToken(userIdLocal);
+              setOtpToken(t);
+              setShowReloadModal(true);
+            }} className={styles.headerAction} style={{ padding: '8px 12px' }}>リロード</button>
+          </div>
           <div className={styles.stampGrid}>
             {locationsToShow.map((loc, idx) => {
               const isVisited = visited.has(loc.id);
@@ -150,6 +188,29 @@ export default function VisitPage() {
       </div>
       {popupId && (
         <AcquiredPopup id={popupId} initialDifficulty="medium" initialLanguage="ja" onClose={() => setPopupId(null)} />
+      )}
+      {popupId && (
+        <AcquiredPopup id={popupId} initialDifficulty="medium" initialLanguage="ja" onClose={() => setPopupId(null)} />
+      )}
+
+      {/* Reload modal: shows ID and a one-time token when user presses リロード in top-right. */}
+      {showReloadModal && (
+        <div className="modal" style={{ display: 'flex' }}>
+          <div className="modalCard">
+            {/* Modal may only be closed with this × button per user request */}
+            <button className="modalClose" onClick={() => setShowReloadModal(false)}>✕</button>
+            <div style={{ textAlign: 'left' }}>
+              <h3>リロード用ワンタイムトークン</h3>
+              <p>ID: <strong>{userIdLocal}</strong></p>
+              <p>トークン（この値は即保存してください）:</p>
+              <div style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6, background: '#fff', wordBreak: 'break-all' }}>{otpToken}</div>
+              <div style={{ marginTop: 12 }}>
+                <button className="primaryBtn" onClick={() => { resetSessionId(); router.push('/sightseeing'); }}>リセットしてSightseeingへ</button>
+                <button className="primaryBtn" style={{ marginLeft: 8 }} onClick={() => { router.push('/sightseeing'); }}>リセットせずに移動（続行）</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

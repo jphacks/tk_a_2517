@@ -4,11 +4,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsQR from "jsqr";
 import { marked } from "marked";
+import { getUserId, getPointsForUser, addPointsForUser } from '../lib/userClient';
 
 export default function SightseeingClient() {
   const [data, setData] = useState(null);
   const [visited, setVisited] = useState(() => new Set());
   const [selected, setSelected] = useState(null);
+  const [points, setPoints] = useState(0);
+  const [userId, setUserId] = useState(null);
   const [qrOpen, setQrOpen] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("idle"); // idle | scanning | success | error
@@ -40,6 +43,23 @@ export default function SightseeingClient() {
       if (!cancelled) setData({ locations: [] });
     };
     load();
+    // assign or obtain sequential id and load per-user points
+    (async () => {
+      try {
+        const assigned = await import('../lib/userClient').then(m => m.assignSequentialId());
+        const id = getUserId();
+        setUserId(id || assigned);
+        const p = getPointsForUser(id || assigned);
+        setPoints(p);
+      } catch (e) {
+        try {
+          const id = getUserId();
+          setUserId(id);
+          const p = getPointsForUser(id);
+          setPoints(p);
+        } catch (e2) {}
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -74,7 +94,17 @@ export default function SightseeingClient() {
     if (visited.has(loc.id)) {
       setSelected({ loc, visited: true });
     } else {
-      setVisited((prev) => new Set(prev).add(loc.id));
+      setVisited((prev) => {
+        const next = new Set(prev);
+        next.add(loc.id);
+        // award points for new stamp (per-user)
+        try {
+          const award = 2; // 2 points per stamp
+          const np = addPointsForUser(userId || getUserId(), award);
+          setPoints(np);
+        } catch (e) {}
+        return next;
+      });
     }
   };
 
@@ -145,8 +175,32 @@ export default function SightseeingClient() {
     }
   };
 
+  
+
   useEffect(() => {
     return () => stopScanning();
+  }, []);
+
+  // support restoring via ?otp=TOKEN
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const usp = new URLSearchParams(window.location.search);
+        const otp = usp.get('otp');
+        if (otp) {
+          const restored = import('../lib/userClient').then(m => m.restoreUserIdFromToken(otp));
+          // after restoring, re-run assignSequentialId flow to pick up new id in session
+          restored.then((resId) => {
+            if (resId) {
+              // reload points/state
+              const id = getUserId();
+              setUserId(id);
+              setPoints(getPointsForUser(id));
+            }
+          }).catch(()=>{});
+        }
+      }
+    } catch (e) {}
   }, []);
 
   return (
@@ -302,6 +356,7 @@ export default function SightseeingClient() {
         .stamp-text { font-size: 12px; margin-top: 4px; color: #444; }
         .progress-bar { background: #e8e0cf; border-radius: 8px; height: 10px; margin: 12px 0; overflow: hidden; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #8b4513, #a0522d); }
+        
       `}</style>
     </div>
   );
