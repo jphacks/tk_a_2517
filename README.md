@@ -96,8 +96,8 @@ Powerpoint: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20A
 
 ### 今後の展望に関するプロトタイプ
 
-## 経緯
-- Hack day - 懇親会でのやり取りを踏まえ、QRally Factoryの需要があると考え、追加実装した。
+## 経緯 - Hack day懇親会にて -
+- Hack day - 懇親会でSoftbank様、How television様、Huawei様とのやり取りを踏まえ、QRally Factoryの需要があると考え、追加実装した。
 
 ## QRally Factory
 
