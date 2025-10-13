@@ -107,12 +107,37 @@ class BackgroundMonitor {
       // Critical状況の場合は即座にレポート生成
       if (criticalParts.length > 0) {
         console.log(`🚨 ${robotId} でCRITICAL状況検知! 緊急レポート生成開始...`);
-        await this.generateCriticalReport(robotId, robotData, criticalParts);
+        // 名称揺れ対策: critical でも emergency レポート生成関数に委譲
+        await this.generateEmergencyReport(robotId, robotData, criticalParts);
       }
       // 警告レベルの場合は通常のレポート生成
       else if (warningParts.length > 0) {
         console.log(`🚨 ${robotId} で異常検知! レポート生成開始...`);
         await this.generateEmergencyReport(robotId, robotData, warningParts);
+      }
+
+      // 監視停止中でも、連続してCriticalが発生していると推定される場合は必ずログを残す
+      // 直近の履歴で同一部位が連続3回以上critical/warningなら、フォールバックで緊急レポートを生成
+      if (!this.isRunning && criticalParts.length === 0) {
+        const suspiciousParts = [];
+        const history = this.historyBuffer?.[robotData.robotId] || {};
+        Object.keys(history).forEach(partId => {
+          const recent = history[partId].slice(-3);
+          if (recent.length === 3) {
+            // 温度高 / 振動高 / 湿度高 / 稼働長時間などのいずれかが閾値越えなら異常継続とみなす
+            const abnormal = recent.every(h => (
+              h.temperature > 60 || h.vibration > 0.4 || h.humidity > 80 || h.operatingHours > 40
+            ));
+            if (abnormal) {
+              const partInfo = robotData.parts.find(p => p.id === partId) || { id: partId, name: partId };
+              suspiciousParts.push({ ...partInfo, status: 'critical' });
+            }
+          }
+        });
+        if (suspiciousParts.length > 0) {
+          console.log('📝 停止中フォールバック: 連続異常を検知したため緊急レポートを強制生成');
+          await this.generateEmergencyReport(robotData.robotId, robotData, suspiciousParts);
+        }
       }
 
     } catch (error) {
@@ -137,17 +162,37 @@ class BackgroundMonitor {
 
     const parts = robotParts.map((part, index) => {
       const seed = Math.random() * 1000;
+      // 温度・振動・湿度・運転時間のほか、電圧低下・CPU負荷・異音などの仮想指標を追加
       const tempBase = 35 + (seed % 20);
-      const spike = (seed % 10) === 0; // さらに頻繁にスパイク（テスト用）
-      const temperature = tempBase + (spike ? 20 : 0);
+      const tempSpike = (seed % 10) === 0;
+      const temperature = tempBase + (tempSpike ? 20 : 0);
+
       const vibration = 0.1 + ((seed % 30) / 200);
+      const vibSpike = (seed % 13) === 0;
+
       const humidity = 40 + (seed % 30);
-      const operatingHours = 1 + (seed % 48); // 1-48時間の範囲
+      const humidSpike = (seed % 17) === 0;
+
+      const operatingHours = 1 + (seed % 48);
+      const longRun = operatingHours > 40;
+
+      // 拡張イベント
+      const voltage = 24 - ((seed % 8) / 10); // 24V系の低下
+      const lowVoltage = voltage < 22.5;
+      const cpuLoad = 30 + (seed % 70); // 30-100%
+      const highCpu = cpuLoad > 85;
+      const abnormalNoise = (seed % 19) === 0; // 異音フラグ
       
       let status = 'normal';
-      if (temperature > 60 || vibration > 0.4 || humidity > 80 || operatingHours > 40) {
+      if (
+        temperature > 60 || vibration > 0.4 || humidity > 80 || longRun ||
+        lowVoltage || highCpu || abnormalNoise || vibSpike || humidSpike || tempSpike
+      ) {
         status = 'critical';
-      } else if (temperature > 50 || vibration > 0.3 || humidity > 70 || operatingHours > 30) {
+      } else if (
+        temperature > 50 || vibration > 0.3 || humidity > 70 || operatingHours > 30 ||
+        voltage < 23.0 || cpuLoad > 75
+      ) {
         status = 'warning';
       }
 
@@ -159,7 +204,11 @@ class BackgroundMonitor {
         humidity,
         operatingHours,
         status,
-        lastUpdate: new Date().toISOString()
+        lastUpdate: new Date().toISOString(),
+        // 拡張指標（UIで未使用でもログ/AI解析の拡張に役立つ）
+        voltage,
+        cpuLoad,
+        abnormalNoise
       };
     });
 
@@ -187,13 +236,21 @@ class BackgroundMonitor {
     };
   }
 
+  // 互換API: 古い呼び出し名に対応
+  async generateCriticalReport(robotId, robotData, criticalParts) {
+    return this.generateEmergencyReport(robotId, robotData, criticalParts);
+  }
+
   // 緊急レポート生成
   async generateEmergencyReport(robotId, robotData, criticalParts) {
-  // レポート生成時刻を日本時間基準で扱う
-  const now = new Date();
-  const jpOptions = { timeZone: 'Asia/Tokyo' };
-  const timestamp = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-  const reportKey = `${robotId}_${timestamp.toISOString().split('T')[0]}`;
+    // ベースとなるUTC時刻
+    const now = new Date();
+    const timestamp = now; // ISO/ファイル名はUTC基準で安定
+    // 日本時間のYYYY-MM-DDを重複判定キーに採用
+    const jpDateKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(now);
+    const reportKey = `${robotId}_${jpDateKey}`;
     
     // 同じ日のレポートが既に生成されている場合はスキップ
     if (this.lastReportTimes[reportKey]) {
@@ -219,7 +276,7 @@ class BackgroundMonitor {
     
     // レポートファイル名を生成
     const reportType = isCritical ? 'CRITICAL' : 'emergency';
-  // ファイル名はタイムスタンプを日本時間に整形して使用
+  // ファイル名はISOを整形して使用（環境依存のパースを避ける）
   const isoForFilename = timestamp.toISOString().replace(/[:.]/g, '-');
   const filename = `${reportType}_report_${robotId}_${isoForFilename}.txt`;
     const filePath = path.join(this.reportsDir, filename);
@@ -273,19 +330,32 @@ class BackgroundMonitor {
 
   // レポート内容生成
   generateReportContent(robotData, criticalParts, aiAnalysis, timestamp, isCritical = false) {
-  // レポート内で表示する時刻は常に日本時間
-  const containerTime = timestamp.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+  // レポート内で表示する時刻は常に日本時間（Intlで生成し、再パースしない）
+  const containerTime = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).format(timestamp);
   const isoTime = timestamp.toISOString();
     
     let content = '';
     content += '='.repeat(80) + '\n';
     
-    if (isCritical) {
-      content += '🚨 CRITICAL レポート - 緊急停止要請\n';
-      content += '⚠️  IMMEDIATE ACTION REQUIRED ⚠️\n';
-    } else {
-      content += '🚨 工場自動監視システム - 緊急レポート\n';
-    }
+    // 見出しバリエーション
+    const headersCritical = [
+      '🚨 CRITICAL レポート - 緊急停止要請',
+      '🚨 臨界異常レポート - 直ちに対応が必要',
+      '🚨 重大障害レポート - 緊急対応指示'
+    ];
+    const headersEmergency = [
+      '🚨 工場自動監視システム - 緊急レポート',
+      '🚨 異常検知レポート - 早急な点検を推奨',
+      '🚨 注意レポート - 予防保全の実施を推奨'
+    ];
+    const header = isCritical 
+      ? headersCritical[Math.floor(Math.random() * headersCritical.length)]
+      : headersEmergency[Math.floor(Math.random() * headersEmergency.length)];
+    content += header + '\n';
+    if (isCritical) content += '⚠️  IMMEDIATE ACTION REQUIRED ⚠️\n';
     
     content += '='.repeat(80) + '\n\n';
     
@@ -341,10 +411,46 @@ class BackgroundMonitor {
     
     criticalParts.forEach((part, index) => {
       const analysis = aiAnalysis[index];
+      // 追加メトリクスの評価
+      const events = [];
+      if (part.temperature !== undefined) {
+        if (part.temperature > 60) events.push(`高温(${part.temperature.toFixed(1)}°C)`);
+        else if (part.temperature > 50) events.push(`温度上昇(${part.temperature.toFixed(1)}°C)`);
+      }
+      if (part.vibration !== undefined) {
+        if (part.vibration > 0.4) events.push(`高振動(${part.vibration.toFixed(3)})`);
+        else if (part.vibration > 0.3) events.push(`振動上昇(${part.vibration.toFixed(3)})`);
+      }
+      if (part.humidity !== undefined) {
+        if (part.humidity > 80) events.push(`高湿度(${part.humidity.toFixed(1)}%)`);
+        else if (part.humidity > 70) events.push(`湿度上昇(${part.humidity.toFixed(1)}%)`);
+      }
+      if (part.operatingHours !== undefined) {
+        if (part.operatingHours > 40) events.push(`長時間稼働(${part.operatingHours}h)`);
+        else if (part.operatingHours > 30) events.push(`稼働時間増加(${part.operatingHours}h)`);
+      }
+      if (part.voltage !== undefined) {
+        if (part.voltage < 22.5) events.push(`電圧低下(${part.voltage.toFixed(1)}V)`);
+        else if (part.voltage < 23.0) events.push(`電圧降下兆候(${part.voltage.toFixed(1)}V)`);
+      }
+      if (part.cpuLoad !== undefined) {
+        if (part.cpuLoad > 85) events.push(`CPU過負荷(${part.cpuLoad.toFixed(0)}%)`);
+        else if (part.cpuLoad > 75) events.push(`CPU負荷上昇(${part.cpuLoad.toFixed(0)}%)`);
+      }
+      if (part.abnormalNoise) {
+        events.push('異音検知');
+      }
+
       content += `${index + 1}. ${part.name}\n`;
       content += `   温度: ${part.temperature.toFixed(1)}°C\n`;
       content += `   振動: ${part.vibration.toFixed(3)}\n`;
       content += `   状態: ${part.status.toUpperCase()}\n`;
+      if (part.humidity !== undefined) content += `   湿度: ${part.humidity.toFixed(1)}%\n`;
+      if (part.operatingHours !== undefined) content += `   稼働時間: ${part.operatingHours}h\n`;
+      if (part.voltage !== undefined) content += `   電圧: ${part.voltage.toFixed(1)}V\n`;
+      if (part.cpuLoad !== undefined) content += `   CPU負荷: ${part.cpuLoad.toFixed(0)}%\n`;
+      if (part.abnormalNoise !== undefined) content += `   異音: ${part.abnormalNoise ? 'あり' : 'なし'}\n`;
+      if (events.length > 0) content += `   事象: ${events.join(', ')}\n`;
       content += `   AI分析: ${analysis.aiSummary}\n`;
       content += `   信頼度: ${(analysis.confidence * 100).toFixed(1)}%\n`;
       content += `   推奨事項:\n`;
@@ -366,9 +472,14 @@ class BackgroundMonitor {
     // 総合推奨事項
     const overallRecommendations = this.aiAgent.generateMaintenanceRecommendations({ parts: criticalParts });
     content += '総合推奨事項:\n';
-    overallRecommendations.forEach(rec => {
-      content += `- ${rec}\n`;
-    });
+    overallRecommendations.forEach(rec => { content += `- ${rec}\n`; });
+    // 異常タイプ別の補足提案
+    const hasVoltage = criticalParts.some(p => p.voltage !== undefined && p.voltage < 23.0);
+    const hasCpu = criticalParts.some(p => p.cpuLoad !== undefined && p.cpuLoad > 75);
+    const hasNoise = criticalParts.some(p => p.abnormalNoise);
+    if (hasVoltage) content += '- 電源品質(電圧降下/リップル)の測定と配線・コネクタ点検\n';
+    if (hasCpu) content += '- コントローラ負荷の平準化、不要プロセスの停止、放熱改善\n';
+    if (hasNoise) content += '- ベアリング/ギア/ファンの健全性診断(振動解析/音響診断)\n';
     content += '\n';
     
     content += '-'.repeat(60) + '\n';

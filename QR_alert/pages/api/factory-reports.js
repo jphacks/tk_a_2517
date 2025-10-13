@@ -22,13 +22,18 @@ export default function handler(req, res) {
       .map(file => {
         const filePath = path.join(reportsDir, file);
         const stats = fs.statSync(filePath);
-        
+        // Linux/コンテナ環境では birthtime が 1970-01-01 になることがあるため、
+        // その場合は mtime を生成時刻の代理として使用する
+        const hasValidBirthtime = stats.birthtime && stats.birthtime.getFullYear && stats.birthtime.getFullYear() > 1980;
+        const createdDate = hasValidBirthtime ? stats.birthtime : stats.mtime;
+        const modifiedDate = stats.mtime;
+
         return {
           filename: file,
           path: filePath,
           size: stats.size,
-          createdAt: stats.birthtime.toISOString(),
-          modifiedAt: stats.mtime.toISOString(),
+          createdAt: createdDate.toISOString(),
+          modifiedAt: modifiedDate.toISOString(),
           isEmergency: file.startsWith('emergency_report_'),
           robotId: file.includes('ROBOT_') ? file.match(/ROBOT_\d+/)?.[0] : null
         };
