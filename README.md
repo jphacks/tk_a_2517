@@ -7,7 +7,7 @@
 
 https://drive.google.com/file/d/1nl0Wp3EX9OzdW5VYa-QZGJ5CoKN6eWe9/view?usp=drive_link
 
-- **QRally - 工場向け - デモURL**
+- **QRally factory - 工場向け - デモURL**
 
 https://drive.google.com/file/d/108BlEQ4uQvlJkwKN-5HXvTHWnOiRlsao/view?resourcekey
 
