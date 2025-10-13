@@ -99,6 +99,10 @@ Powerpoint: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20A
 
 ![](./docs/img/QRally/img_all_stamp.png)
 
+- **商品購入**
+
+![](./docs/img/QRally/img_prize.png)
+
 ### 今後の展望
 
 - Psysical AI × QR による故障部位の早期発見
