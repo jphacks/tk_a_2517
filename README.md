@@ -1,6 +1,6 @@
 # QRally
 
-![](./docs/img/QRally//img_top.png)
+![](./docs/img/QRally/img_top.png)
 
 ## デモ
 QRally - 観光向け
@@ -82,16 +82,20 @@ Powerpoint: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20A
 
 #### 実際の画面（観光向け QRally）
 
-- ホーム（QRコード画面）
+- **ホーム（QRコード画面）**
+
 ![](./docs/img/QRally/img_qr.png)
 
-- 使用している画像に関するページ
+- **使用している画像に関するページ**
+
 ![](./docs/img/QRally/img_progress.png)
 
-- 人のレベルに応じて説明文が変わる
+- **人のレベルに応じて説明文が変わる**
+
 ![](./docs/img/QRally/img_stamp.png)
 
-- スタンプ記録
+- **スタンプ記録**
+
 ![](./docs/img/QRally/img_all_stamp.png)
 
 ### 今後の展望
@@ -301,23 +305,40 @@ QR_alertディレクトリに実装されたQRally Factoryは、8つの主要画
 
 #### 実際の画面（工場向け QRally）
 
-- ホーム（QRコード画面）
+- **ホーム（QRコード画面）**
+
 ![](./docs/img/QRally_factory/QRally_factory_home.png)
-- ロボット一つ目
+
+- **ロボット一つ目**
+
 ![](./docs/img/QRally_factory/QRally_factory_robot_1.png)
-- ロボット二つ目
+
+- **ロボット二つ目**
+
 ![](./docs/img/QRally_factory/QRally_factory_robot_2.png)
-- ロボット三つ目
+
+- **ロボット三つ目**
+
 ![](./docs/img/QRally_factory/QRally_factory_robot_3.png)
-- アラート詳細
+
+- **アラート詳細**
+
 ![](./docs/img/QRally_factory/QRally_factory_alert_1.png)
-- AI分析
+
+- **AI分析**
+
 ![](./docs/img/QRally_factory/QRally_factory_analysis_1.png)
-- 責任者ダッシュボード
+
+- **責任者ダッシュボード**
+
 ![](./docs/img/QRally_factory/QRally_factory_robot_Auto_Notification_Dashboard.png)
-- 監視システム
+
+- **監視システム**
+
 ![](./docs/img/QRally_factory/QRally_factory_robot_monitoring.png)
-- システム仕様書
+
+- **システム仕様書**
+
 ![](./docs/img/QRally_factory/QRally_factory_readme.png)
 
 ### 詳細な画面仕様書
