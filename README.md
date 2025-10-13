@@ -8,7 +8,8 @@ URL: https://drive.google.com/file/d/1nl0Wp3EX9OzdW5VYa-QZGJ5CoKN6eWe9/view?usp=
 
 
 QRally - 工場向け
-URL:
+URL: https://drive.google.com/file/d/108BlEQ4uQvlJkwKN-5HXvTHWnOiRlsao/view?resourcekey
+
 
 ## 製品概要
 
