@@ -8,19 +8,20 @@ import { loadItemByIdAndLevel } from './stampUtils';
 // AcquiredPopup supports two modes:
 // - item mode: pass `item` prop (already-loaded) and optionally `level` to display
 // - id mode: pass `id` and `initialDifficulty` and the component will load the item
-export default function AcquiredPopup({ item: itemProp = null, id = null, initialDifficulty = 'medium', level = null, onClose }) {
+export default function AcquiredPopup({ item: itemProp = null, id = null, initialDifficulty = 'medium', level = null, initialLanguage = 'ja', onClose }) {
   const [difficulty, setDifficulty] = useState(initialDifficulty);
   const [item, setItem] = useState(itemProp);
+  const [language, setLanguage] = useState((initialLanguage || 'ja').toLowerCase());
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const it = await loadItemByIdAndLevel(id, difficulty);
+      const it = await loadItemByIdAndLevel(id, difficulty, language);
       setItem(it);
     } catch (e) {
       setItem(null);
     }
-  }, [id, difficulty]);
+  }, [id, difficulty, language]);
 
   useEffect(() => {
     // if an item prop was provided, prefer it; otherwise load when id/difficulty present
@@ -29,13 +30,18 @@ export default function AcquiredPopup({ item: itemProp = null, id = null, initia
       return;
     }
     if (id) load();
-  }, [id, difficulty, itemProp, load]);
+  }, [id, difficulty, language, itemProp, load]);
 
   const handleDifficultyChange = useCallback((lv) => {
     let next = String(lv || 'medium').toLowerCase();
     if (next === 'detailed') next = 'detail';
     if (!['detail', 'medium', 'simple'].includes(next)) next = 'medium';
     setDifficulty(next);
+  }, []);
+
+  const handleLanguageChange = useCallback((lv) => {
+    const next = String(lv || 'ja').toLowerCase() === 'en' ? 'en' : 'ja';
+    setLanguage(next);
   }, []);
 
   // determine displayed level label
@@ -60,17 +66,28 @@ export default function AcquiredPopup({ item: itemProp = null, id = null, initia
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className={styles.modalAttrs}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <strong>文章レベル:</strong>
                   <select
                     value={displayLevel}
                     onChange={(e) => handleDifficultyChange(e.target.value)}
                     className={styles.primaryBtn}
-                    style={{ padding: '6px 10px' }}
+                    style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}
                   >
                     <option value="detail">詳し目</option>
                     <option value="medium">中くらい</option>
                     <option value="simple">簡単</option>
+                  </select>
+                  <span style={{ margin: '0 4px 0 12px' }}><strong>言語:</strong></span>
+                  <select
+                    value={language}
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    className={styles.primaryBtn}
+                    style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}
+                    aria-label="言語"
+                  >
+                    <option value="ja">日本語</option>
+                    <option value="en">English</option>
                   </select>
                 </div>
               </div>

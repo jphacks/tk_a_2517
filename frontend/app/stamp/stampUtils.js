@@ -57,16 +57,20 @@ export function pickAcquiredId(locations) {
 }
 
 // Load single item JSON by id and difficulty level
-export async function loadItemByIdAndLevel(id, level = 'medium') {
+export async function loadItemByIdAndLevel(id, level = 'medium', language = 'ja') {
   if (!id) return null;
   const lv = level || 'medium';
-  const url = `/json/stamp/${lv}/${id}.json`;
+  const lang = (language || 'ja').toLowerCase();
+  // ja: use original folder (detail|medium|simple)
+  // en: use *_eg folders (detail_eg|medium_eg|simple_eg)
+  const dir = lang === 'en' ? `${lv}_eg` : lv;
+  const url = `/json/stamp/${dir}/${id}.json`;
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`failed: ${res.status}`);
     return await res.json();
   } catch (e) {
-    console.error('loadItemByIdAndLevel failed', id, lv, e);
+    console.error('loadItemByIdAndLevel failed', id, lv, lang, e);
     return null;
   }
 }
