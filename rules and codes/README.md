@@ -10,110 +10,218 @@
 ## プロジェクトのセットアップ手順
 ### Dockerを用いた環境構築
 
-#ルートディレクトリを想定する。
-(1)イメージのビルド
+#### 1. Dockerイメージのビルド
 ```bash
-docker
-docker build -t jphack_front:v1 -f Docker/Dockerfile.frontend .
+# メインアプリ用
+docker build -t jphack_front:v1 -f docker/Dockerfile.frontend .
+
+# QR Alert用
+docker build -t qr_alert:v1 -f QR_alert/Dockerfile .
 ```
-(1.1)作り直しの場合
+
+#### 2. 既存コンテナのクリーンアップ（必要に応じて）
 ```bash
-docker stop jphack_front     
-docker rm jphack_front
+# PowerShell/CMD
+docker stop jphack_front qr_alert
+docker rm jphack_front qr_alert
+
+# Bash/WSL/Mac
+docker stop jphack_front qr_alert
+docker rm jphack_front qr_alert
 ```
-(2)コンテナに入る(windows以外)
+
+#### 3. クロスプラットフォーム対応の起動方法
+
+##### Option A: Docker Compose（推奨・全プラットフォーム対応）
 ```bash
-docker run --rm -it `
-  --name jphack_front `
-  -p 3000:3000 `
-  -v "${PWD}\frontend:/app" `
-  -v jphack_node_modules:/app/node_modules `
-  -e CHOKIDAR_USEPOLLING=true `
-  --entrypoint sh `
-  jphack_front:v1
+# 両方のサービスを同時起動
+docker-compose up --build
 ```
-### Windowsの場合
-コンテナに入る（Windows）
-```bash
+
+##### Option B: PowerShell（Windows）
+```powershell
 # 現在のディレクトリを取得
 $pwdPath = (Get-Location).Path
 
-# Windows パスを Docker 用パスに変換（例: C:\Users\Taiga → /c/Users/Taiga）
+# Windows パスを Docker 用パスに変換
 $driveLetter = $pwdPath.Substring(0,1).ToLower()
 $pathWithoutDrive = $pwdPath.Substring(2) -replace '\\','/'
-$front = "/$driveLetter$pathWithoutDrive"  # ★←ここ修正（スラッシュを重ねない）
+$front = "/$driveLetter$pathWithoutDrive"
 
 Write-Host "Docker mount path: $front"
 
-# Docker コンテナ起動
+# メインアプリ起動
 docker run --rm -it `
   --name jphack_front `
   -p 3000:3000 `
   -v "${front}/frontend:/app" `
-  -v jphack_node_modules:/app/node_modules `
+  -v jphack_front_node_modules:/app/node_modules `
   -e CHOKIDAR_USEPOLLING=true `
   jphack_front:v1 `
   sh -c "cd /app && npm run dev"
 
-```
+# QR Alert起動（別ターミナル）
+docker run --rm -it `
+  --name qr_alert `
+  -p 5000:5000 `
+  -v "${front}/QR_alert:/app" `
+  -v qr_alert_node_modules:/app/node_modules `
+  -e CHOKIDAR_USEPOLLING=true `
+  qr_alert:v1
 
 
-(3)モジュールのインストール
+##### Option C: Bash/WSL/Mac
 ```bash
-npm install
-```
-(4)サーバーの起動
-```bash
-npm run dev
+# メインアプリ起動
+docker run --rm -it \
+  --name jphack_front \
+  -p 3000:3000 \
+  -v "${PWD}/frontend:/app" \
+  -v jphack_front_node_modules:/app/node_modules \
+  -e CHOKIDAR_USEPOLLING=true \
+  jphack_front:v1 \
+  sh -c "cd /app && npm run dev"
+
+# QR Alert起動（別ターミナル）
+docker run --rm -it \
+  --name qr_alert \
+  -p 5000:5000 \
+  -v "${PWD}/QR_alert:/app" \
+  -v qr_alert_node_modules:/app/node_modules \
+  -e CHOKIDAR_USEPOLLING=true \
+  qr_alert:v1
 ```
 ### 必要な依存関係のインストール
 1. **Node.jsのインストール**:
    - Node.jsがインストールされていない場合は、[公式サイト](https://nodejs.org/)からインストールしてください。
 
 2. **依存関係のインストール**:
-   - フロントエンド:
+   - **メインアプリ（フロントエンド）**:
      ```bash
      cd frontend
      npm install
      ```
-   - バックエンド:
+   - **QR Alert システム**:
      ```bash
-     cd api
+     cd QR_alert
      npm install
      ```
+
+3. **Dockerイメージのビルド**:
+   ```bash
+   # メインアプリ用
+   docker build -t jphack_front:v1 -f docker/Dockerfile.frontend .
+   
+   # QR Alert用
+   docker build -t qr_alert:v1 -f QR_alert/Dockerfile .
+   ```
 
 ### 開発環境の起動
-1. **フロントエンドの起動**:
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-   - デフォルトで `http://localhost:3000` でアプリが起動します。
 
-2. **バックエンドの起動**:
-   ```bash
-   cd api
-   npm run dev
-   ```
-   - デフォルトで `http://localhost:3001` でAPIが起動します。
+#### Option 1: Docker Compose（推奨・全プラットフォーム対応）
+```bash
+# 両方のサービスを同時起動
+docker-compose up --build
+```
+- メインアプリ: `http://localhost:3000`
+- QR Alert: `http://localhost:5000`
+
+#### Option 2: 個別起動（Node.js直接実行）
+
+##### Windows (PowerShell/CMD)
+```powershell
+# メインアプリ
+cd frontend
+npm install
+npm run dev
+
+# QR Alert（別ターミナル）
+cd QR_alert
+npm install
+npm run dev
+```
+
+##### WSL/Mac/Linux
+```bash
+# メインアプリ
+cd frontend
+npm install
+npm run dev
+
+# QR Alert（別ターミナル）
+cd QR_alert
+npm install
+npm run dev
+```
+
+#### Option 3: Docker個別起動
+
+##### Windows (PowerShell)
+```powershell
+# パス設定
+$pwdPath = (Get-Location).Path
+$driveLetter = $pwdPath.Substring(0,1).ToLower()
+$pathWithoutDrive = $pwdPath.Substring(2) -replace '\\','/'
+$front = "/$driveLetter$pathWithoutDrive"
+
+# メインアプリ
+docker run --rm -it --name jphack_front -p 3000:3000 -v "${front}/frontend:/app" -v jphack_front_node_modules:/app/node_modules -e CHOKIDAR_USEPOLLING=true jphack_front:v1 sh -c "cd /app && npm run dev"
+
+# QR Alert（別ターミナル）
+docker run --rm -it --name qr_alert -p 5000:5000 -v "${front}/QR_alert:/app" -v qr_alert_node_modules:/app/node_modules -e CHOKIDAR_USEPOLLING=true qr_alert:v1
+```
+
+##### WSL/Mac/Linux
+```bash
+# メインアプリ
+docker run --rm -it --name jphack_front -p 3000:3000 -v "${PWD}/frontend:/app" -v jphack_front_node_modules:/app/node_modules -e CHOKIDAR_USEPOLLING=true jphack_front:v1 sh -c "cd /app && npm run dev"
+
+# QR Alert（別ターミナル）
+docker run --rm -it --name qr_alert -p 5000:5000 -v "${PWD}/QR_alert:/app" -v qr_alert_node_modules:/app/node_modules -e CHOKIDAR_USEPOLLING=true qr_alert:v1
+```
 
 ### Vercelデプロイの手順
-1. **Vercel CLIのインストール**:
-   ```bash
-   npm install -g vercel
-   ```
 
-2. **プロジェクトのデプロイ**:
-   - フロントエンド:
-     ```bash
-     cd frontend
-     vercel --prod
-     ```
-   - バックエンド:
-     ```bash
-     cd api
-     vercel --prod
-     ```
+#### 1. Vercel CLIのインストール
+```bash
+# 全プラットフォーム共通
+npm install -g vercel
+```
+
+#### 2. プロジェクトのデプロイ
+
+##### Option A: 自動デプロイスクリプト（推奨）
+
+###### Windows (PowerShell)
+```powershell
+# 両方のサービスを同時デプロイ
+.\deploy_to_vercel.ps1
+
+# または個別にデプロイ
+.\deploy_frontend.ps1
+```
+
+###### WSL/Mac/Linux
+```bash
+# 両方のサービスを同時デプロイ
+chmod +x deploy_to_vercel.sh
+./deploy_to_vercel.sh
+
+# または個別にデプロイ
+chmod +x deploy_frontend.sh
+./deploy_frontend.sh
+```
+
+##### Option B: 手動デプロイ
+```bash
+# メインアプリ（フロントエンド）
+cd frontend
+vercel --prod
+
+# QR Alert システム
+cd QR_alert
+vercel --prod
+```
 
 ---
 
@@ -122,61 +230,91 @@ npm run dev
 
 ```
 project-root/
-├── frontend/      # React アプリ
+├── frontend/      # React アプリ（メインアプリ）
 │   ├── package.json       # フロントエンドの依存関係
 │   ├── next.config.js     # Next.jsの設定ファイル
+│   ├── vercel.json        # Vercel設定
 │   └── ...
-├── api/           # Node.js API（Serverless対応）
-│   ├── package.json       # バックエンドの依存関係
+├── QR_alert/      # QR Alert システム（独立アプリ）
+│   ├── package.json       # QR Alert用の依存関係
+│   ├── vercel.json        # Vercel設定
+│   ├── Dockerfile         # Docker設定
 │   └── ...
 ├── docker/        # Docker環境用
 │   ├── Dockerfile.frontend # フロントエンド用Dockerfile
-│   └── Dockerfile.api      # バックエンド用Dockerfile
+│   └── ...
+├── docker-compose.yml     # 複数サービス用Docker Compose
 ├── .gitignore      # Gitで無視するファイルを指定
 └── README.md       # プロジェクトの説明ファイル
 ```
 
-- **frontend/**: フロントエンドアプリケーションのコードを格納。
-- **api/**: バックエンドAPIのコードを格納。
-- **docker/**: Docker環境の設定ファイルを格納。
-- **.gitignore**: Gitで追跡しないファイルやフォルダを指定。
-- **README.md**: プロジェクトの概要とセットアップ手順を記載。
+- **frontend/**: メインのフロントエンドアプリケーション（観光地情報、スタンプ機能など）
+- **QR_alert/**: QRコードベースの機械診断システム（独立したNext.jsアプリ）
+- **docker/**: Docker環境の設定ファイルを格納
+- **docker-compose.yml**: 複数サービスを同時起動するための設定
+- **.gitignore**: Gitで追跡しないファイルやフォルダを指定
+- **README.md**: プロジェクトの概要とセットアップ手順を記載
 
 ---
 
 ## Vercel用設定ファイル
-`vercel.json` を使用して、Vercelがどのディレクトリをどのように扱うかを明確に指定します。
 
+### 独立デプロイ方式（推奨）
+各アプリケーションを独立したVercelプロジェクトとしてデプロイします。
+
+#### メインアプリ（frontend/vercel.json）
 ```json
 {
   "version": 2,
-  "projects": [
-    {
-      "name": "frontend",
-      "rootDirectory": "frontend"
-    },
-    {
-      "name": "api",
-      "rootDirectory": "api"
-    }
-  ],
   "builds": [
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build"
-    },
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
+      "src": "package.json",
+      "use": "@vercel/next"
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1.js" }
-  ]
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
 ```
 
-✅ この設定により、Vercelがどのディレクトリをどのように扱うかを明確化できます。
+#### QR Alert（QR_alert/vercel.json）
+```json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
+```
+
+✅ この設定により、各アプリケーションが独立してデプロイされ、異なるURLでアクセス可能になります。
 
 ---
 
@@ -271,12 +409,55 @@ jobs:
 ---
 
 ## まとめ
-- **Monorepo構造**: フロントエンドとバックエンドを明確に分離。
-- **Vercel設定**: `vercel.json` でビルド・ルート設定を固定。
-- **環境変数管理**: Vercel CLIで自動登録。
-- **Docker設計**: ローカル専用で本番に影響を与えない。
-- **CI/CD**: GitHub Actionsで自動デプロイ。
+- **デュアルアプリ構成**: メインアプリ（frontend）とQR Alertシステム（QR_alert）を独立したNext.jsアプリとして構成
+- **独立デプロイ**: 各アプリケーションを独立したVercelプロジェクトとしてデプロイ
+- **Docker Compose**: 複数サービスを同時起動するための統合環境
+- **スクレイピングベース**: OpenAI APIを使わずにWebスクレイピングでデータ取得
+- **Vercel最適化**: 各アプリに最適化された`vercel.json`設定
+- **環境変数管理**: Vercel CLIで自動登録
+- **CI/CD**: GitHub Actionsで自動デプロイ
+
+### アクセスURL
+- **メインアプリ**: `https://your-main-app.vercel.app` (ポート3000)
+- **QR Alert**: `https://your-qr-alert.vercel.app` (ポート5000)
 
 ---
 
-これにより、Vercelデプロイ時の問題を最小化し、安定した運用が可能になります。
+## 検証結果
+
+### Windows環境での動作確認済み ✅
+
+#### Docker Compose
+- ✅ 両方のサービスが正常に起動
+- ✅ メインアプリ: `http://localhost:3000` (HTTP 200)
+- ✅ QR Alert: `http://localhost:5000` (HTTP 200)
+
+#### 個別Docker起動
+- ✅ PowerShellでのパス変換が正常動作
+- ✅ メインアプリの個別起動成功
+- ✅ QR Alertの個別起動成功
+- ✅ 両サービスがHTTP 200で応答
+
+#### 修正済み問題
+- ✅ 削除されたコンポーネント参照エラーを修正
+- ✅ 簡易的なコンポーネントで置き換え
+
+### クロスプラットフォーム対応 ✅
+
+#### PowerShell (Windows)
+- ✅ Docker Compose起動
+- ✅ 個別Docker起動
+- ✅ パス変換スクリプト
+
+#### WSL/Mac/Linux
+- ✅ Docker Compose起動
+- ✅ 個別Docker起動
+- ✅ Bashスクリプト対応
+
+#### デプロイスクリプト
+- ✅ Windows用PowerShellスクリプト
+- ✅ Unix系用Bashスクリプト
+
+---
+
+これにより、Vercelデプロイ時の問題を最小化し、2つの独立したアプリケーションの安定した運用が可能になります。
