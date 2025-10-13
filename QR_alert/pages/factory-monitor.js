@@ -10,6 +10,7 @@ export default function FactoryMonitor() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [updateInterval, setUpdateInterval] = useState(null);
   const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [notificationStats, setNotificationStats] = useState(null);
 
   // 監視システムの状態を取得
   const fetchStatus = async () => {
@@ -18,6 +19,7 @@ export default function FactoryMonitor() {
       const data = await response.json();
       if (data.success) {
         setMonitorStatus(data.status);
+        setNotificationStats(data.status?.notifications || null);
         setLastUpdate(new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }));
       }
     } catch (error) {
@@ -268,7 +270,7 @@ export default function FactoryMonitor() {
               border: '1px solid #334155'
             }}>
               <h3 style={{ margin: '0 0 12px 0', color: '#ff8800' }}>📊 監視状態</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
                 <div>
                   <strong>状態:</strong> 
                   <span style={{ 
@@ -290,6 +292,61 @@ export default function FactoryMonitor() {
                     : (lastUpdate || '—')}
                 </div>
               </div>
+
+              {/* 電源オフ中のロボット */}
+              <div style={{ marginTop: '12px' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#93c5fd' }}>🔌 電源オフ中のロボット</h4>
+                {monitorStatus.poweredOffRobots && Object.keys(monitorStatus.poweredOffRobots).length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                    {Object.entries(monitorStatus.poweredOffRobots).map(([rid, info]) => (
+                      <div key={rid} style={{ background:'#0b1220', border:'1px solid #334155', borderRadius:4, padding:8, color:'#93c5fd' }}>
+                        {rid}: 残り {info.remainingSec}s
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: '#6b7280' }}>なし</div>
+                )}
+              </div>
+
+              {/* ロボット別レポート要約 */}
+              <div style={{ marginTop: '12px' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#93c5fd' }}>📈 ロボット別レポート要約</h4>
+                {monitorStatus.robotsSummary && Object.keys(monitorStatus.robotsSummary).length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+                    {Object.entries(monitorStatus.robotsSummary).map(([rid, s]) => (
+                      <div key={rid} style={{ background:'#0b1220', border:'1px solid #334155', borderRadius:4, padding:8 }}>
+                        <div style={{ color:'#93c5fd', fontWeight:'bold' }}>{rid}</div>
+                        <div style={{ color:'#e5e7eb' }}>total {s.total}, CRITICAL {s.critical}, emergency {s.emergency}</div>
+                        <div style={{ color:'#9ca3af', fontSize:12 }}>最終: {s.lastReportAt ? new Date(s.lastReportAt).toLocaleString('ja-JP') : '—'} ({s.lastReportType || '—'})</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: '#6b7280' }}>データなし</div>
+                )}
+              </div>
+
+              {/* 通知統計 */}
+              {notificationStats && (
+                <div style={{ marginTop: '12px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: '#f59e0b' }}>🚨 通知統計</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px,1fr))', gap: '8px' }}>
+                    <div style={{ background:'#0b1220', border:'1px solid #334155', borderRadius:4, padding:8 }}>
+                      <div style={{ color:'#9ca3af' }}>総数</div>
+                      <div style={{ color:'#f59e0b', fontWeight:'bold' }}>{notificationStats.totalNotifications}</div>
+                    </div>
+                    <div style={{ background:'#0b1220', border:'1px solid #334155', borderRadius:4, padding:8 }}>
+                      <div style={{ color:'#9ca3af' }}>本日</div>
+                      <div style={{ color:'#f59e0b', fontWeight:'bold' }}>{notificationStats.todayNotifications}</div>
+                    </div>
+                    <div style={{ background:'#0b1220', border:'1px solid #334155', borderRadius:4, padding:8 }}>
+                      <div style={{ color:'#9ca3af' }}>最終通知</div>
+                      <div style={{ color:'#10b981' }}>{notificationStats.lastNotification ? new Date(notificationStats.lastNotification.timestamp).toLocaleString('ja-JP') : '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

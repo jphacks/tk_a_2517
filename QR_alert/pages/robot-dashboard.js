@@ -28,6 +28,7 @@ export default function RobotDashboard() {
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [updateInterval, setUpdateInterval] = useState(null);
+  const statusRef = useRef(null);
 
   useEffect(() => {
     if (!id) return;
@@ -39,6 +40,7 @@ export default function RobotDashboard() {
         const json = await res.json();
         if (mounted) {
           setRobotData(json);
+          statusRef.current = json?.overallStatus;
           setLastUpdate(new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }));
           
           // 新しいアラートを生成（AI分析結果を含む）
@@ -66,8 +68,8 @@ export default function RobotDashboard() {
 
     fetchRobotData();
     
-    // より頻繁な更新（3秒ごと）
-    const interval = setInterval(fetchRobotData, 3000);
+  // より頻繁な更新（2秒ごと）
+  const interval = setInterval(fetchRobotData, 2000);
     setUpdateInterval(interval);
     
     return () => { 
@@ -86,6 +88,7 @@ export default function RobotDashboard() {
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'stopped': return '#22c55e'; // 停止=SAFEを強調（鮮明な緑）
       case 'emergency': return '#ff0000'; // 緊急時の鮮明な赤
       case 'critical': return '#ff0000'; // 鮮明な赤
       case 'warning': return '#ff8800'; // 鮮明なオレンジ
@@ -96,6 +99,7 @@ export default function RobotDashboard() {
 
   const getStatusText = (status) => {
     switch (status) {
+      case 'stopped': return 'SAFE';
       case 'emergency': return 'EMERGENCY';
       case 'critical': return 'CRITICAL';
       case 'warning': return 'WARNING';
@@ -223,11 +227,23 @@ export default function RobotDashboard() {
           </div>
           
           <div style={{ height: '60vh', position: 'relative', backgroundColor: '#1e293b', borderRadius: '8px', overflow: 'hidden' }}>
-            <MultiPartRobot 
-              robotData={{...robotData, robotId: id}} 
+            {(() => {
+              // 停止中は3D表示も全パーツを安全(緑)に
+              const safeRobotData = robotData && robotData.overallStatus === 'stopped'
+                ? {
+                    ...robotData,
+                    robotId: id,
+                    parts: (robotData.parts || []).map(p => ({ ...p, status: 'normal' }))
+                  }
+                : { ...(robotData || {}), robotId: id };
+              return (
+                <MultiPartRobot 
+                  robotData={safeRobotData} 
               selectedPart={selectedPart} 
               onPartClick={setSelectedPart}
-            />
+                />
+              );
+            })()}
             
             {/* 全体ステータス表示 */}
             <div style={{ position: 'absolute', right: '12px', top: '12px' }}>
@@ -325,9 +341,9 @@ export default function RobotDashboard() {
                 
                 return (
                   <>
-                    <p><strong>Status:</strong> {getStatusText(part.status)}</p>
-                    <p><strong>Temperature:</strong> {part.temperature?.toFixed(1)}°C</p>
-                    <p><strong>Vibration:</strong> {part.vibration?.toFixed(3)}</p>
+                    <p><strong>Status:</strong> {robotData.overallStatus === 'stopped' ? 'SAFE' : getStatusText(part.status)}</p>
+                    <p><strong>Temperature:</strong> {robotData.overallStatus === 'stopped' ? 'SAFE' : `${part.temperature?.toFixed(1)}°C`}</p>
+                    <p><strong>Vibration:</strong> {robotData.overallStatus === 'stopped' ? 'SAFE' : part.vibration?.toFixed(3)}</p>
                     <p><strong>Last Update:</strong> {new Date(part.lastUpdate).toLocaleTimeString()}</p>
                     {part.issues && part.issues.length > 0 && (
                       <div>
@@ -352,9 +368,9 @@ export default function RobotDashboard() {
             <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#1e293b', borderRadius: '8px' }}>
               <h4>📈 Overall Statistics</h4>
               <p><strong>Total Parts:</strong> {robotData.parts?.length || 0}</p>
-              <p><strong>Normal:</strong> {robotData.parts?.filter(p => p.status === 'normal').length || 0}</p>
-              <p><strong>Warning:</strong> {robotData.parts?.filter(p => p.status === 'warning').length || 0}</p>
-              <p><strong>Critical:</strong> {robotData.parts?.filter(p => p.status === 'critical').length || 0}</p>
+              <p><strong>Normal:</strong> {robotData.overallStatus === 'stopped' ? (robotData.parts?.length || 0) : (robotData.parts?.filter(p => p.status === 'normal').length || 0)}</p>
+              <p><strong>Warning:</strong> {robotData.overallStatus === 'stopped' ? 0 : (robotData.parts?.filter(p => p.status === 'warning').length || 0)}</p>
+              <p><strong>Critical:</strong> {robotData.overallStatus === 'stopped' ? 0 : (robotData.parts?.filter(p => p.status === 'critical').length || 0)}</p>
               <p><strong>Last Check:</strong> {new Date(robotData.lastCheck).toLocaleTimeString()}</p>
             </div>
           )}

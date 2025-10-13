@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import styles from '../stamp/stamp.module.css';
 import { getUserId, getPointsForUser, assignSequentialId, resetSessionId, createOneTimeToken } from '../lib/userClient';
 import { getPointsPerStamp } from '../lib/pointsConfig';
@@ -189,29 +190,31 @@ export default function VisitPage() {
       {popupId && (
         <AcquiredPopup id={popupId} initialDifficulty="medium" initialLanguage="ja" onClose={() => setPopupId(null)} />
       )}
-      {popupId && (
-        <AcquiredPopup id={popupId} initialDifficulty="medium" initialLanguage="ja" onClose={() => setPopupId(null)} />
-      )}
 
       {/* Reload modal: shows ID and a one-time token when user presses リロード in top-right. */}
-      {showReloadModal && (
-        <div className="modal" style={{ display: 'flex' }}>
-          <div className="modalCard">
+      {showReloadModal && createPortal(
+        <div className={styles.modal} style={{ display: 'flex' }}>
+          <div className={styles.modalCard}>
             {/* Modal may only be closed with this × button per user request */}
-            <button className="modalClose" onClick={() => setShowReloadModal(false)}>✕</button>
+            <button className={styles.modalClose} onClick={() => setShowReloadModal(false)}>✕</button>
             <div style={{ textAlign: 'left' }}>
               <h3>リロード用ワンタイムトークン</h3>
               <p>ID: <strong>{userIdLocal}</strong></p>
               <p>トークン（この値は即保存してください）:</p>
-              <div style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6, background: '#fff', wordBreak: 'break-all' }}>{otpToken}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input readOnly value={otpToken || ''} style={{ flex: 1, padding: '8px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff' }} />
+                <button className={styles.primaryBtn} onClick={async () => {
+                  try { await navigator.clipboard.writeText(otpToken || ''); } catch (e) {}
+                }}>コピー</button>
+              </div>
               <div style={{ marginTop: 12 }}>
-                <button className="primaryBtn" onClick={() => { resetSessionId(); router.push('/sightseeing'); }}>リセットしてSightseeingへ</button>
-                <button className="primaryBtn" style={{ marginLeft: 8 }} onClick={() => { router.push('/sightseeing'); }}>リセットせずに移動（続行）</button>
+                <button className={styles.primaryBtn} onClick={() => { resetSessionId(); router.push('/sightseeing'); }}>リセットしてSightseeingへ</button>
+                <button className={styles.primaryBtn} style={{ marginLeft: 8 }} onClick={() => { router.push('/sightseeing'); }}>リセットせずに移動（続行）</button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>, document.body)
+      }
     </div>
   );
 }
