@@ -12,7 +12,7 @@ https://drive.google.com/file/d/14M9S9J1i9Zew4usQOfXAayGnJvgjGsf6/view?usp=shari
 https://drive.google.com/file/d/1ZpnYWFkmMRDLYpuQOCNACPI7BjrBoRI5/view?usp=sharing
 
 ## 詳細資料
-Powerpoint: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20Award%20day用.pdf)
+PDF: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20Award%20day用.pdf)
 
 
 ## 製品概要
