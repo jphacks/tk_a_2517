@@ -99,7 +99,7 @@ Powerpoint: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20A
 
 ![](./docs/img/QRally/img_all_stamp.png)
 
-- **商品購入**
+- **商品交換**
 
 ![](./docs/img/QRally/img_prize.png)
 
