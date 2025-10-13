@@ -278,6 +278,16 @@
   pointer-events: none; /* avoid stealing clicks from neighbor cells */
 }
 
+/* header action used by visit/prize links */
+.headerAction {
+  background: #e9d6b0;
+  border: 1px solid #c9ab80;
+  padding: 6px 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #000;
+}
+
 /* Show original image inside tile (not clipped). Kept small but uncropped. */
 .stampImageOriginal {
   width: 96px;
