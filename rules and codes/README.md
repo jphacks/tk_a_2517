@@ -1,5 +1,7 @@
 # Vercelデプロイで起きやすい問題と改善案
 
+> 補足: 本プロジェクトの一枚説明（One-Pager）は `docs/QRally_OnePager.md` にまとめています。製品コンセプトとアーキテクチャの全体像はそちらをご参照ください。
+
 ## 概要
 このプロジェクトでは、Vercelを使用したデプロイ時に発生しやすい問題とその改善案について説明します。特に、フロントエンドとバックエンドが同じリポジトリに存在する場合の混乱を防ぐための構成を提案します。
 
@@ -66,7 +68,7 @@ docker run --rm -it `
   -v qr_alert_node_modules:/app/node_modules `
   -e CHOKIDAR_USEPOLLING=true `
   qr_alert:v1
-```
+
 
 ##### Option C: Bash/WSL/Mac
 ```bash
