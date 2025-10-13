@@ -149,7 +149,7 @@ export default function VisitPage() {
         </div>
       </div>
       {popupId && (
-        <AcquiredPopup id={popupId} initialDifficulty="medium" onClose={() => setPopupId(null)} />
+        <AcquiredPopup id={popupId} initialDifficulty="medium" initialLanguage="ja" onClose={() => setPopupId(null)} />
       )}
     </div>
   );

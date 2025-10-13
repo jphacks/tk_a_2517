@@ -48,6 +48,7 @@ export default function KyotoStampRallyPage() {
   const [currentItem, setCurrentItem] = useState(null); // 単一アイテム { id, image, text, difficultyLabel }
   const promoTimerRef = useRef(null); // 仕様変更後は未使用だが念のため保持
   const [difficulty, setDifficulty] = useState('medium'); // detailed|medium|simple
+  const [language, setLanguage] = useState('ja'); // 'ja' | 'en'
   const [error, setError] = useState(null);
   const bootOnceRef = useRef(false);
   const [acquiredId, setAcquiredId] = useState(null); // 左側に表示する獲得画像のID
@@ -99,11 +100,11 @@ export default function KyotoStampRallyPage() {
     if (promoTimerRef.current) clearTimeout(promoTimerRef.current);
     promoTimerRef.current = setTimeout(async () => {
       setStampGetVisible(false);
-      const item = await loadItemByIdAndLevel(chosenId, difficulty);
+      const item = await loadItemByIdAndLevel(chosenId, difficulty, language);
       if (item) setCurrentItem(item);
       setPromoOpen(true);
     }, 2000);
-  }, [difficulty, loadItemByIdAndLevel]);
+  }, [difficulty, language, loadItemByIdAndLevel]);
 
   // 初期UI表示後に一度だけ自動発火（クリック不要）
   useEffect(() => {
@@ -120,12 +121,12 @@ export default function KyotoStampRallyPage() {
     if (promoTimerRef.current) clearTimeout(promoTimerRef.current);
     promoTimerRef.current = setTimeout(async () => {
       setStampGetVisible(false);
-      const item = await loadItemByIdAndLevel(chosen, difficulty);
+      const item = await loadItemByIdAndLevel(chosen, difficulty, language);
       if (item) setCurrentItem(item);
       setPromoOpen(false);
       setShowInlineAcquiredView(true);
     }, 2000);
-  }, [showUI, data, difficulty]);
+  }, [showUI, data, difficulty, language]);
 
   // スタンプラリー開始
   function startStampRally(d = data) {
@@ -214,10 +215,20 @@ export default function KyotoStampRallyPage() {
     setDifficulty(next);
     // テキストのみ差し替え（Stamp GET を出さない）
     if (acquiredId) {
-      const item = await loadItemByIdAndLevel(acquiredId, next);
+      const item = await loadItemByIdAndLevel(acquiredId, next, language);
       if (item) setCurrentItem(item);
     }
-  }, [acquiredId, loadItemByIdAndLevel]);
+  }, [acquiredId, language, loadItemByIdAndLevel]);
+
+  // 言語切替（セレクト）
+  const handleLanguageChange = useCallback(async (lv) => {
+    const nextLang = (String(lv || 'ja').toLowerCase() === 'en') ? 'en' : 'ja';
+    setLanguage(nextLang);
+    if (acquiredId) {
+      const item = await loadItemByIdAndLevel(acquiredId, difficulty, nextLang);
+      if (item) setCurrentItem(item);
+    }
+  }, [acquiredId, difficulty]);
 
   return (
     <div className={styles.pageRoot}>
@@ -336,18 +347,30 @@ export default function KyotoStampRallyPage() {
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 12 }}>
               <img src={currentItem.image} alt={currentItem.id} className={styles.promoImage} style={{ maxWidth: 360, height: 'auto', flex: '0 0 auto' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                   <label htmlFor="difficulty-inline2" style={{ marginRight: 8 }}>文章レベル:</label>
                   <select
                     id="difficulty-inline2"
                     value={difficulty}
                     onChange={(e) => handleDifficultyChange(e.target.value)}
                     className={styles.primaryBtn}
-                    style={{ padding: '6px 10px' }}
+                    style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}
                   >
                     <option value="detail">詳し目</option>
                     <option value="medium">中くらい</option>
                     <option value="simple">簡単</option>
+                  </select>
+                  <label htmlFor="lang-inline2" style={{ margin: '0 8px 0 16px' }}>言語:</label>
+                  <select
+                    id="lang-inline2"
+                    value={language}
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    className={styles.primaryBtn}
+                    style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}
+                    aria-label="言語"
+                  >
+                    <option value="ja">日本語</option>
+                    <option value="en">English</option>
                   </select>
                 </div>
                 <div className={styles.promoText}>

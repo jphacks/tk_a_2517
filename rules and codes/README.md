@@ -40,6 +40,8 @@ docker-compose up --build
 
 ##### Option B: PowerShell（Windows）
 ```powershell
+#dockerを止める
+docker stop jphack_front
 # 現在のディレクトリを取得
 $pwdPath = (Get-Location).Path
 

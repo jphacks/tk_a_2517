@@ -1,0 +1,7 @@
+:root{--header-bg:#f0e0c9;--action-bg:#e9d6b0}
+.site-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--header-bg);box-shadow:0 1px 0 rgba(0,0,0,0.06)}
+.site-header-left,.site-header-center,.site-header-right{display:flex;align-items:center}
+.site-title{margin:0;font-size:18px}
+.header-action{background:var(--action-bg);border:1px solid #c9ab80;padding:6px 10px;border-radius:8px;text-decoration:none;color:#000}
+.header-action:active{transform:translateY(1px)}
+.menu-btn{background:transparent;border:none;font-size:20px;margin-right:8px}
