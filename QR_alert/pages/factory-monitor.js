@@ -6,6 +6,7 @@ export default function FactoryMonitor() {
   const [monitorStatus, setMonitorStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [reports, setReports] = useState([]);
+  const [lastReportTime, setLastReportTime] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [updateInterval, setUpdateInterval] = useState(null);
   const [sessionStartTime, setSessionStartTime] = useState(null);
@@ -39,8 +40,18 @@ export default function FactoryMonitor() {
             return reportTime >= sessionStartTime;
           });
           setReports(sessionReports);
+          if (sessionReports.length > 0) {
+            setLastReportTime(new Date(sessionReports[0].createdAt));
+          } else {
+            setLastReportTime(null);
+          }
         } else {
           setReports(allReports);
+          if (allReports.length > 0) {
+            setLastReportTime(new Date(allReports[0].createdAt));
+          } else {
+            setLastReportTime(null);
+          }
         }
       }
     } catch (error) {
@@ -274,17 +285,10 @@ export default function FactoryMonitor() {
                   <strong>生成レポート数:</strong> {monitorStatus.reportsGenerated}
                 </div>
                 <div>
-                  <strong>最終レポート:</strong> 
-                  {monitorStatus.lastReportTimes && Object.keys(monitorStatus.lastReportTimes).length > 0 
-                    ? Object.values(monitorStatus.lastReportTimes)[Object.keys(monitorStatus.lastReportTimes).length - 1]
-                    : 'なし'
-                  }
+                  <strong>最終レポート/最終更新:</strong> {lastReportTime 
+                    ? new Date(lastReportTime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+                    : (lastUpdate || '—')}
                 </div>
-                {lastUpdate && (
-                  <div>
-                    <strong>最終更新:</strong> {lastUpdate}
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -355,7 +359,7 @@ export default function FactoryMonitor() {
                     </span>
                   </div>
                   <div style={{ fontSize: '14px', color: '#e5e7eb', marginBottom: '8px' }}>
-                    <strong>生成時刻:</strong> {report.createdAt}
+                    <strong>生成時刻:</strong> {new Date(report.createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                   </div>
                   <div style={{ fontSize: '12px', color: '#6b7280' }}>
                     <strong>パス:</strong> {report.path}
