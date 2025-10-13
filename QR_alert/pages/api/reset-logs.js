@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { getBackgroundMonitor } from '../../lib/backgroundMonitor';
+import { getFactoryManagerNotification } from '../../lib/factoryManagerNotification';
 
 export default function handler(req, res) {
   if (req.method !== 'POST') {
@@ -44,7 +46,7 @@ export default function handler(req, res) {
       });
     }
 
-    // グローバル変数をリセット（メモリ内のデータ）
+  // グローバル変数をリセット（メモリ内のデータ）
     if (typeof global !== 'undefined') {
       if (global.alertHistory) {
         Object.keys(global.alertHistory).forEach(key => {
@@ -68,7 +70,23 @@ export default function handler(req, res) {
       }
     }
 
-    console.log(`ログリセット完了: ${resetCount}個のファイル/データをリセット`);
+    // バックグラウンドモニタの内部状態リセット
+    try {
+      const monitor = getBackgroundMonitor();
+      monitor.reset && monitor.reset();
+    } catch (e) {
+      console.error('背景モニタのリセットに失敗:', e);
+    }
+
+    // 工場責任者通知の累積統計と履歴をリセット
+    try {
+      const fm = getFactoryManagerNotification();
+      fm.resetAll && fm.resetAll();
+    } catch (e) {
+      console.error('通知システムのリセットに失敗:', e);
+    }
+
+  console.log(`ログリセット完了: ${resetCount}個のファイル/データをリセット（メモリ状態も初期化）`);
 
     res.status(200).json({
       success: true,

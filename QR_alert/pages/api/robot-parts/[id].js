@@ -2,6 +2,14 @@
 import RobotDiagnosticAI from '../../../lib/aiAgent';
 import { getFactoryManagerNotification } from '../../../lib/factoryManagerNotification';
 
+// background monitor is server-side; require lazily
+let getBackgroundMonitor = null;
+try {
+  getBackgroundMonitor = require('../../../lib/backgroundMonitor').getBackgroundMonitor;
+} catch (e) {
+  // ignore if not available in this context
+}
+
 export default function handler(req, res) {
   const { id } = req.query;
   
@@ -58,6 +66,80 @@ export default function handler(req, res) {
   }
 
   // 各部位の状態を生成
+  // If monitor indicates robot is powered off, return stopped-state parts
+  if (getBackgroundMonitor) {
+    try {
+      const monitor = getBackgroundMonitor();
+      if (monitor && typeof monitor.isRobotPoweredOff === 'function' && monitor.isRobotPoweredOff(id)) {
+        const stoppedParts = robotParts.map(p => ({
+          id: p.id,
+          name: p.name,
+          status: 'stopped',
+          temperature: 25.0,
+          vibration: 0.0,
+          humidity: 40.0,
+          operatingHours: 0,
+          lastUpdate: containerTimestamp,
+          issues: [],
+          containerTime: containerTime.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+          dockerTime: containerTime.toISOString(),
+          aiAnalysis: {
+            overallSeverity: 'normal',
+            temperatureAnalysis: {},
+            vibrationAnalysis: {},
+            humidityAnalysis: {},
+            fatigueAnalysis: {},
+            aiRecommendations: [],
+            aiSummary: 'stopped',
+            confidence: 1.0
+          }
+        }));
+
+        // Respond with stopped parts and skip alert generation
+        const criticalCount = 0;
+        const warningCount = 0;
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(200).json({
+          robotId: id,
+          robotName: `Robot ${id}`,
+          overallStatus: 'stopped',
+          parts: stoppedParts,
+          lastCheck: containerTimestamp,
+          containerTime: containerTime.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+          dockerTime: containerTime.toISOString(),
+          statistics: {
+            totalParts: stoppedParts.length,
+            normal: stoppedParts.length,
+            warning: warningCount,
+            critical: criticalCount
+          },
+          alertMechanism: {
+            active: false,
+            frequency: 'paused',
+            lastCheck: containerTimestamp,
+            totalAlerts: 0,
+            recentAlerts: []
+          },
+          temperatureHistory: global.temperatureHistory[id]?.slice(-10) || [],
+          aiAgentAnalysis: {
+            agentName: aiAgent.name,
+            agentVersion: aiAgent.version,
+            capabilities: aiAgent.capabilities,
+            overallRecommendations: [],
+            analysisTimestamp: containerTimestamp,
+            totalPartsAnalyzed: stoppedParts.length,
+            criticalPartsCount: 0,
+            warningPartsCount: 0
+          }
+        });
+        return;
+      }
+    } catch (e) {
+      // fallback to normal behavior on errors
+      console.error('monitor check error', e);
+    }
+  }
+
   const parts = robotParts.map((part, index) => {
     const partSeed = (combinedSeed + index * 137) % 1000;
     

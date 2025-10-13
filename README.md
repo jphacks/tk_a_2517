@@ -5,11 +5,11 @@
 ## デモ
 - **QRally - 観光向け - デモURL**
 
-https://drive.google.com/file/d/1nl0Wp3EX9OzdW5VYa-QZGJ5CoKN6eWe9/view?usp=drive_link
+https://drive.google.com/file/d/14M9S9J1i9Zew4usQOfXAayGnJvgjGsf6/view?usp=sharing
 
 - **QRally factory - 工場向け - デモURL**
 
-https://drive.google.com/file/d/108BlEQ4uQvlJkwKN-5HXvTHWnOiRlsao/view?resourcekey
+https://drive.google.com/file/d/1ZpnYWFkmMRDLYpuQOCNACPI7BjrBoRI5/view?usp=sharing
 
 ## 詳細資料
 Powerpoint: [JPHacks Award day用資料](./docs/materials/tka_2517%20JPHacks%20Award%20day用.pdf)

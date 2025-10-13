@@ -316,11 +316,19 @@ export function initializeStampRally() {
     
     if (typeof setTimeout !== 'undefined') {
       setTimeout(() => {
-        if (document.body.contains(notification)) {
-          document.body.removeChild(notification);
+        try {
+          if (notification && notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        } catch (e) {
+          // ignore removal errors
         }
-        if (document.head.contains(style)) {
-          document.head.removeChild(style);
+        try {
+          if (style && style.parentNode) {
+            style.parentNode.removeChild(style);
+          }
+        } catch (e) {
+          // ignore removal errors
         }
       }, 2000);
     }

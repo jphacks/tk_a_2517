@@ -1,160 +1,171 @@
-import fs from 'fs';
-import path from 'path';
-
-// 工場責任者通知システム
-class FactoryManagerNotification {
-  constructor() {
-    this.notificationsDir = path.join(process.cwd(), 'notifications');
-    this.emergencyNotifications = [];
-    
-    // 通知ディレクトリが存在しない場合は作成
-    if (!fs.existsSync(this.notificationsDir)) {
-      fs.mkdirSync(this.notificationsDir, { recursive: true });
-    }
-  }
-
-  // 緊急通知を送信
-  sendEmergencyNotification(robotId, dangerDetails) {
-    const timestamp = new Date();
-    const notification = {
-      id: `EMERGENCY_${robotId}_${timestamp.getTime()}`,
-      timestamp: timestamp.toISOString(),
-      robotId,
-      type: 'EMERGENCY_STOP_REQUIRED',
-      title: '🚨 緊急停止要請',
-      message: `ロボット ${robotId} で連続危険状況が検知されました。工場責任者による即座の停止操作が必要です。`,
-      details: dangerDetails,
-      severity: 'CRITICAL',
-      actionRequired: 'IMMEDIATE_STOP',
-      containerTime: timestamp.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
-      dockerTime: timestamp.toISOString()
-    };
-
-    // メモリに保存
-    this.emergencyNotifications.push(notification);
-    
-    // ファイルに保存
-    this.saveNotificationToFile(notification);
-    
-    // システムログに記録
-    this.logEmergencyEvent(notification);
-    
-    console.log(`🚨 緊急通知送信: ${robotId} - 工場責任者による停止が必要`);
-    
-    return notification;
-  }
-
-  // 通知をファイルに保存
-  saveNotificationToFile(notification) {
-    try {
-      const filename = `emergency_notification_${notification.id}.txt`;
-      const filePath = path.join(this.notificationsDir, filename);
-      
-      const content = this.generateNotificationContent(notification);
-      fs.writeFileSync(filePath, content, 'utf8');
-      
-      console.log(`📄 緊急通知ファイル保存: ${filename}`);
-    } catch (error) {
-      console.error('通知ファイル保存エラー:', error);
-    }
-  }
-
-  // 通知内容を生成
-  generateNotificationContent(notification) {
-    let content = '';
-    content += '='.repeat(80) + '\n';
-    content += '🚨 工場責任者向け緊急通知\n';
-    content += '='.repeat(80) + '\n\n';
-    
-    content += `通知ID: ${notification.id}\n`;
-    content += `ロボットID: ${notification.robotId}\n`;
-    content += `通知タイプ: ${notification.type}\n`;
-    content += `重要度: ${notification.severity}\n`;
-    content += `必要アクション: ${notification.actionRequired}\n`;
-    content += `通知時刻: ${notification.containerTime}\n`;
-    content += `ISO時刻: ${notification.dockerTime}\n\n`;
-    
-    content += '-'.repeat(60) + '\n';
-    content += '📋 通知内容\n';
-    content += '-'.repeat(60) + '\n\n';
-    
-    content += `タイトル: ${notification.title}\n\n`;
-    content += `メッセージ: ${notification.message}\n\n`;
-    
-    content += '-'.repeat(60) + '\n';
-    content += '🔍 危険状況詳細\n';
-    content += '-'.repeat(60) + '\n\n';
-    
-    if (notification.details && notification.details.length > 0) {
-      notification.details.forEach((detail, index) => {
-        content += `${index + 1}. ${detail.partName}\n`;
-        content += `   温度: ${detail.temperature.toFixed(1)}°C\n`;
-        content += `   振動: ${detail.vibration.toFixed(3)}\n`;
-        content += `   湿度: ${detail.humidity.toFixed(1)}%\n`;
-        content += `   運転時間: ${detail.operatingHours}時間\n`;
-        content += `   危険レベル: ${detail.dangerLevel}\n`;
-        content += `   検知時刻: ${detail.containerTime}\n\n`;
-      });
-    }
-    
-    content += '-'.repeat(60) + '\n';
-    content += '⚠️ 工場責任者への指示\n';
-    content += '-'.repeat(60) + '\n\n';
-    
-    content += '1. 即座にロボットの運転を停止してください\n';
-    content += '2. 安全確認を実施してください\n';
-    content += '3. メンテナンスチームに連絡してください\n';
-    content += '4. 詳細な点検を実施してください\n';
-    content += '5. 再開前に安全確認を完了してください\n\n';
-    
-    content += '='.repeat(80) + '\n';
-    content += 'End of Emergency Notification\n';
-    content += '='.repeat(80) + '\n';
-    
-    return content;
-  }
-
-  // システムログに記録
-  logEmergencyEvent(notification) {
-    try {
-      const logPath = path.join(this.notificationsDir, 'emergency_log.txt');
-      const logEntry = `[${notification.dockerTime}] EMERGENCY: ${notification.robotId} - ${notification.type} - Action: ${notification.actionRequired}\n`;
-      
-      fs.appendFileSync(logPath, logEntry, 'utf8');
-    } catch (error) {
-      console.error('緊急ログ記録エラー:', error);
-    }
-  }
-
-  // 通知履歴を取得
-  getNotificationHistory() {
-    return this.emergencyNotifications.slice(-20); // 最新20件
-  }
-
-  // 通知統計を取得
-  getNotificationStats() {
-    const total = this.emergencyNotifications.length;
-    const today = new Date().toDateString();
-    const todayCount = this.emergencyNotifications.filter(n => 
-      new Date(n.timestamp).toDateString() === today
-    ).length;
-    
-    return {
-      totalNotifications: total,
-      todayNotifications: todayCount,
-      lastNotification: this.emergencyNotifications[this.emergencyNotifications.length - 1] || null
-    };
+// factoryManagerNotification.js - single clean server-safe implementation
+/* eslint-disable no-console */
+let fsLocal = null;
+let pathLocal = null;
+let EventEmitterLocal = null;
+if (typeof window === 'undefined' && typeof process !== 'undefined') {
+  try {
+    fsLocal = require('fs');
+    pathLocal = require('path');
+    EventEmitterLocal = require('events').EventEmitter;
+  } catch (e) {
+    fsLocal = null;
+    pathLocal = null;
+    EventEmitterLocal = null;
   }
 }
 
-// グローバルインスタンス
-let factoryManagerNotification = null;
+function FactoryManagerNotification() {
+  this.notificationsDir = (pathLocal && pathLocal.join(process.cwd(), 'notifications')) || 'notifications';
+  this.emergencyNotifications = [];
+  this.emitter = EventEmitterLocal ? new EventEmitterLocal() : null;
+  this.statsPath = pathLocal ? pathLocal.join(this.notificationsDir, 'stats.json') : null;
+  this._stats = { grandTotal: 0, byDate: {}, lastTimestamp: null };
 
-export function getFactoryManagerNotification() {
-  if (!factoryManagerNotification) {
-    factoryManagerNotification = new FactoryManagerNotification();
+  if (fsLocal) {
+    try {
+      if (!fsLocal.existsSync(this.notificationsDir)) fsLocal.mkdirSync(this.notificationsDir, { recursive: true });
+      // load cumulative stats if present
+      try {
+        if (this.statsPath && fsLocal.existsSync(this.statsPath)) {
+          const rawStats = fsLocal.readFileSync(this.statsPath, 'utf8');
+          const parsed = JSON.parse(rawStats);
+          if (parsed && typeof parsed.grandTotal === 'number') this._stats = parsed;
+        }
+      } catch (e) { /* ignore */ }
+      const files = fsLocal.readdirSync(this.notificationsDir).filter(f => f && f.endsWith('.json'));
+      const loaded = [];
+      for (let i = 0; i < files.length; i++) {
+        try {
+          const raw = fsLocal.readFileSync(pathLocal.join(this.notificationsDir, files[i]), 'utf8');
+          const obj = JSON.parse(raw);
+          if (obj && obj.id) loaded.push(obj);
+        } catch (e) {
+          // ignore malformed
+        }
+      }
+      loaded.sort((a, b) => new Date(a.dockerTime || a.timestamp).getTime() - new Date(b.dockerTime || b.timestamp).getTime());
+      if (loaded.length) this.emergencyNotifications = loaded.slice(-100);
+    } catch (e) {
+      // ignore
+    }
   }
-  return factoryManagerNotification;
 }
 
+FactoryManagerNotification.prototype.sendEmergencyNotification = function(robotId, details) {
+  const now = new Date();
+  const n = {
+    id: 'EMERGENCY_' + robotId + '_' + now.getTime(),
+    timestamp: now.toISOString(),
+    robotId,
+    type: 'EMERGENCY_STOP_REQUIRED',
+    title: '🚨 緊急停止要請',
+    message: `ロボット ${robotId} で連続危険状況が検知されました。`,
+    details: details || [],
+    severity: 'CRITICAL',
+    actionRequired: 'IMMEDIATE_STOP',
+    containerTime: now.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+    dockerTime: now.toISOString()
+  };
+  this.emergencyNotifications.push(n);
+  this._persist(n);
+  this._bumpStats(now);
+  if (this.emitter) this.emitter.emit('update', this.getNotificationHistory());
+  return n;
+};
+
+FactoryManagerNotification.prototype._persist = function(notification) {
+  if (!fsLocal) return;
+  try {
+    const base = 'emergency_notification_' + notification.id;
+    fsLocal.writeFileSync(pathLocal.join(this.notificationsDir, base + '.txt'), this._format(notification), 'utf8');
+    try { fsLocal.writeFileSync(pathLocal.join(this.notificationsDir, base + '.json'), JSON.stringify(notification, null, 2), 'utf8'); } catch (e) {}
+  } catch (e) {
+    console.error('persist error', e);
+  }
+};
+
+FactoryManagerNotification.prototype._bumpStats = function(nowDate) {
+  if (!fsLocal) return;
+  try {
+    const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(nowDate);
+    this._stats.grandTotal = (this._stats.grandTotal || 0) + 1;
+    if (!this._stats.byDate) this._stats.byDate = {};
+    this._stats.byDate[dayKey] = (this._stats.byDate[dayKey] || 0) + 1;
+    this._stats.lastTimestamp = nowDate.toISOString();
+    if (this.statsPath) fsLocal.writeFileSync(this.statsPath, JSON.stringify(this._stats, null, 2), 'utf8');
+  } catch (e) { /* ignore */ }
+};
+
+FactoryManagerNotification.prototype._format = function(notification) {
+  let out = '';
+  out += `通知ID: ${notification.id}\n`;
+  out += `ロボットID: ${notification.robotId}\n`;
+  out += `タイトル: ${notification.title}\n\n`;
+  out += `${notification.message}\n\n`;
+  if (notification.details && notification.details.length) notification.details.forEach((d, i) => out += `${i + 1}. ${d.partName || d.partId}\n`);
+  return out;
+};
+
+FactoryManagerNotification.prototype.getNotificationHistory = function() {
+  return this.emergencyNotifications.slice(-20);
+};
+
+FactoryManagerNotification.prototype.removeNotificationsForRobot = function(robotId) {
+  if (!robotId) return;
+  this.emergencyNotifications = this.emergencyNotifications.filter(n => n.robotId !== robotId);
+  if (fsLocal) {
+    try {
+      const files = fsLocal.readdirSync(this.notificationsDir);
+      for (const f of files) {
+        if (f.includes(robotId) && (f.endsWith('.txt') || f.endsWith('.json'))) {
+          try { fsLocal.unlinkSync(pathLocal.join(this.notificationsDir, f)); } catch (e) { /* ignore */ }
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (this.emitter) this.emitter.emit('update', this.getNotificationHistory());
+};
+
+FactoryManagerNotification.prototype.onUpdate = function(cb) {
+  if (!this.emitter) return function() {};
+  this.emitter.on('update', cb);
+  return () => this.emitter.removeListener('update', cb);
+};
+
+FactoryManagerNotification.prototype.getNotificationStats = function() {
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const activeCount = this.emergencyNotifications.length;
+  const derivedLast = this.emergencyNotifications[this.emergencyNotifications.length - 1] || null;
+  const lastTimestamp = this._stats.lastTimestamp || (derivedLast ? derivedLast.timestamp : null);
+  return {
+    totalNotifications: this._stats.grandTotal || activeCount,
+    todayNotifications: (this._stats.byDate && this._stats.byDate[todayKey]) || 0,
+    lastNotification: lastTimestamp ? { timestamp: lastTimestamp } : (derivedLast || null),
+    activeCount
+  };
+};
+
+FactoryManagerNotification.prototype.resetAll = function() {
+  // Clear in-memory
+  this.emergencyNotifications = [];
+  this._stats = { grandTotal: 0, byDate: {}, lastTimestamp: null };
+  // Remove persisted files
+  if (fsLocal) {
+    try {
+      const files = fsLocal.readdirSync(this.notificationsDir);
+      for (const f of files) {
+        try { fsLocal.unlinkSync(pathLocal.join(this.notificationsDir, f)); } catch (e) { /* ignore */ }
+      }
+      // Ensure stats file reflects reset
+      if (this.statsPath) {
+        try { fsLocal.writeFileSync(this.statsPath, JSON.stringify(this._stats, null, 2), 'utf8'); } catch (e) {}
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (this.emitter) this.emitter.emit('update', this.getNotificationHistory());
+};
+
+let singleton = null;
+export function getFactoryManagerNotification() { if (!singleton) singleton = new FactoryManagerNotification(); return singleton; }
 export default FactoryManagerNotification;

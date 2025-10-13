@@ -6,6 +6,8 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
 }
 
 import RobotDiagnosticAI from './aiAgent';
+// factoryManagerNotification is a server-only module; require it lazily when needed to avoid Next.js bundling 'fs' into client
+let getFactoryManagerNotification = null;
 
 // バックグラウンド監視システム
 class BackgroundMonitor {
@@ -15,6 +17,9 @@ class BackgroundMonitor {
     this.aiAgent = new RobotDiagnosticAI();
     this.reportsDir = path.join(process.cwd(), 'reports');
     this.lastReportTimes = {}; // 重複レポート防止用
+    this.poweredOffRobots = {}; // robotId -> expiry ISO
+    this.powerOffTimers = {}; // robotId -> timeout
+  this.lastNotificationAt = {}; // robotId -> ISO timestamp for notification cooldown
     // 部位ごとの履歴バッファ（各ロボットID -> partId -> [{temperature,vibration,humidity,operatingHours,timestamp}, ...]）
     this.historyBuffer = {};
     
@@ -24,15 +29,62 @@ class BackgroundMonitor {
     }
   }
 
+  // 指定ロボットを一時的に電源オフ状態にする（durationMs ミリ秒）
+  powerOffRobot(robotId, durationMs = 60000) {
+    if (!robotId) return;
+    const expireAt = new Date(Date.now() + durationMs).toISOString();
+    this.poweredOffRobots[robotId] = expireAt;
+
+    // clear existing timer
+    if (this.powerOffTimers[robotId]) {
+      clearTimeout(this.powerOffTimers[robotId]);
+    }
+
+    // When time is up, restore robot and schedule a follow-up emergency report generation
+    this.powerOffTimers[robotId] = setTimeout(async () => {
+      delete this.poweredOffRobots[robotId];
+      delete this.powerOffTimers[robotId];
+      console.log(`🔌 ロボット ${robotId} の電源が自動復帰しました`);
+      try {
+        // After a short delay, run a follow-up check that may re-generate alerts
+        // Use checkRobotStatus to run the normal detection path
+        await this.checkRobotStatus(robotId);
+      } catch (e) {
+        console.error('復帰後の自動チェックでエラー:', e);
+      }
+    }, durationMs);
+
+    console.log(`🔌 ロボット ${robotId} を ${Math.round(durationMs/1000)} 秒間 電源オフにしました`);
+  }
+
+  // ロボットが電源オフ中かどうかを判定
+  isRobotPoweredOff(robotId) {
+    if (!robotId) return false;
+    const expiry = this.poweredOffRobots[robotId];
+    if (!expiry) return false;
+    const now = new Date();
+    if (new Date(expiry) <= now) {
+      delete this.poweredOffRobots[robotId];
+      if (this.powerOffTimers[robotId]) {
+        clearTimeout(this.powerOffTimers[robotId]);
+        delete this.powerOffTimers[robotId];
+      }
+      return false;
+    }
+    return true;
+  }
+
   // 監視開始
   startMonitoring() {
     if (this.isRunning) return;
     
     this.isRunning = true;
     console.log('🏭 工場監視システム: バックグラウンド監視を開始しました');
-    // 起動時に reports フォルダを完全削除して古いファイル/プロセス遺留をクリア
+    // 起動時のレポートクリーンアップはオプション化（既定は保持して整合性を保つ）
+    // 環境変数 RESET_REPORTS_ON_START=true の場合のみ削除
     try {
-      if (fs && fs.existsSync(this.reportsDir)) {
+      const shouldReset = (process?.env?.RESET_REPORTS_ON_START === 'true');
+      if (shouldReset && fs && fs.existsSync(this.reportsDir)) {
         const entries = fs.readdirSync(this.reportsDir);
         entries.forEach(entry => {
           const full = path.join(this.reportsDir, entry);
@@ -48,7 +100,7 @@ class BackgroundMonitor {
             console.error('reports フォルダ内ファイル削除中にエラー:', e);
           }
         });
-        console.log('🧹 reports ディレクトリをクリーンアップしました');
+        console.log('🧹 reports ディレクトリをクリーンアップしました（RESET_REPORTS_ON_START=true）');
       }
     } catch (err) {
       console.error('reports ディレクトリのクリーンアップに失敗:', err);
@@ -72,6 +124,21 @@ class BackgroundMonitor {
     console.log('🏭 工場監視システム: バックグラウンド監視を停止しました');
   }
 
+  // 全内部状態のリセット（レポートファイルは reset-logs API で削除済み想定）
+  reset() {
+    try {
+      Object.values(this.powerOffTimers || {}).forEach(t => { try { clearTimeout(t); } catch (_) {} });
+      this.powerOffTimers = {};
+      this.poweredOffRobots = {};
+      this.historyBuffer = {};
+      this.lastReportTimes = {};
+      this.lastNotificationAt = {};
+      console.log('🧹 背景モニタの内部状態をリセットしました');
+    } catch (e) {
+      console.error('背景モニタのリセット中にエラー:', e);
+    }
+  }
+
   // 全ロボットの状態をチェック
   async checkAllRobots() {
     const robotIds = ['ROBOT_001', 'ROBOT_002', 'ROBOT_003'];
@@ -88,10 +155,16 @@ class BackgroundMonitor {
   // 個別ロボットの状態チェック
   async checkRobotStatus(robotId) {
     try {
-      // ロボットデータを取得（実際の実装ではAPIを呼び出し）
-      const robotData = await this.getRobotData(robotId);
-      
-      if (!robotData || !robotData.parts) return;
+        // ロボットデータを取得（実際の実装ではAPIを呼び出し）
+        const robotData = await this.getRobotData(robotId);
+
+        // If robot is powered off, do not generate notifications and skip
+        if (this.isRobotPoweredOff(robotId)) {
+          console.log(`⚪ ロボット ${robotId} は電源オフ中のため監視をスキップします`);
+          return;
+        }
+
+        if (!robotData || !robotData.parts) return;
 
       // Critical状況の検知
       const criticalParts = robotData.parts.filter(part => 
@@ -115,6 +188,35 @@ class BackgroundMonitor {
         console.log(`🚨 ${robotId} で異常検知! レポート生成開始...`);
         await this.generateEmergencyReport(robotId, robotData, warningParts);
       }
+
+      // 通知はより俊敏に（クールダウン付き）
+      try {
+        const cooldownMs = Number(process?.env?.NOTIF_COOLDOWN_MS || 30000); // 既定30秒
+        const now = Date.now();
+        const lastAt = this.lastNotificationAt[robotId] ? new Date(this.lastNotificationAt[robotId]).getTime() : 0;
+        const shouldNotify = (criticalParts.length > 0 || warningParts.length > 0) && (now - lastAt >= cooldownMs);
+        if (shouldNotify) {
+          if (!getFactoryManagerNotification && typeof window === 'undefined') {
+            try { getFactoryManagerNotification = require('./factoryManagerNotification').getFactoryManagerNotification; } catch (_) {}
+          }
+          if (getFactoryManagerNotification) {
+            const fm = getFactoryManagerNotification();
+            const partsForNotif = (criticalParts.length > 0 ? criticalParts : warningParts).map(p => ({
+              partId: p.id,
+              partName: p.name,
+              temperature: p.temperature,
+              vibration: p.vibration,
+              humidity: p.humidity,
+              operatingHours: p.operatingHours,
+              dangerLevel: p.status === 'critical' ? 'critical' : (p.status || 'warning'),
+              containerTime: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+              dockerTime: new Date().toISOString()
+            }));
+            try { fm.sendEmergencyNotification(robotId, partsForNotif); } catch (_) {}
+            this.lastNotificationAt[robotId] = new Date().toISOString();
+          }
+        }
+      } catch (e) { /* ignore notif errors */ }
 
       // 監視停止中でも、連続してCriticalが発生していると推定される場合は必ずログを残す
       // 直近の履歴で同一部位が連続3回以上critical/warningなら、フォールバックで緊急レポートを生成
@@ -147,6 +249,8 @@ class BackgroundMonitor {
 
   // ロボットデータを取得（シミュレーション）
   async getRobotData(robotId) {
+    // デモ/検証用: 環境変数 FORCE_STOPPED_MODE=true の間は常に停止状態を返す
+    const forceStopped = (process?.env?.FORCE_STOPPED_MODE === 'true');
     // 実際の実装では、ここでAPIを呼び出してロボットデータを取得
     // 今回はシミュレーションデータを生成
     
@@ -212,6 +316,24 @@ class BackgroundMonitor {
       };
     });
 
+    // If robot is powered off, return stopped-state parts (stable readings)
+    if (forceStopped || this.isRobotPoweredOff(robotId)) {
+      const stoppedParts = parts.map(p => ({
+        ...p,
+        temperature: 25.0,
+        vibration: 0.0,
+        humidity: 40.0,
+        status: 'stopped',
+        lastUpdate: new Date().toISOString()
+      }));
+      return {
+        robotId,
+        robotName: `Robot ${robotId}`,
+        parts: stoppedParts,
+        lastCheck: new Date().toISOString()
+      };
+    }
+
     // 履歴バッファに追加
     if (!this.historyBuffer[robotId]) this.historyBuffer[robotId] = {};
     parts.forEach(p => {
@@ -252,11 +374,12 @@ class BackgroundMonitor {
     }).format(now);
     const reportKey = `${robotId}_${jpDateKey}`;
     
-    // 同じ日のレポートが既に生成されている場合はスキップ
+    // 同じ日のレポートが既に生成されている場合はスキップ（間隔は環境変数で調整可能）
+    const dedupeMs = Number(process?.env?.REPORT_DEDUPE_MS || 300000); // 既定5分
     if (this.lastReportTimes[reportKey]) {
       const lastTime = new Date(this.lastReportTimes[reportKey]);
       const timeDiff = timestamp.getTime() - lastTime.getTime();
-      if (timeDiff < 300000) { // 5分以内はスキップ
+      if (timeDiff < dedupeMs) { // 設定間隔未満はスキップ
         return;
       }
     }
@@ -305,6 +428,39 @@ class BackgroundMonitor {
     
     // ログファイルにも記録
     await this.logToSystemLog(robotId, criticalParts, filename, isCritical);
+    
+    // Notify factory manager system (persisted notifications)
+    try {
+      // lazy-require on server only
+      if (!getFactoryManagerNotification && typeof window === 'undefined') {
+        try {
+          getFactoryManagerNotification = require('./factoryManagerNotification').getFactoryManagerNotification;
+        } catch (e) {
+          // ignore
+        }
+      }
+      if (getFactoryManagerNotification) {
+        const dangerDetails = criticalParts.map(p => ({
+          partId: p.id,
+          partName: p.name,
+          temperature: p.temperature,
+          vibration: p.vibration,
+          humidity: p.humidity,
+          operatingHours: p.operatingHours,
+          dangerLevel: p.status === 'critical' || p.status === 'emergency' ? 'critical' : 'warning',
+          containerTime: timestamp.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+          dockerTime: timestamp.toISOString()
+        }));
+        try {
+          const fm = getFactoryManagerNotification();
+          fm.sendEmergencyNotification(robotId, dangerDetails);
+        } catch (e) {
+          // ignore notification errors
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   // AI分析実行
@@ -538,11 +694,90 @@ class BackgroundMonitor {
 
   // 監視状態を取得
   getStatus() {
+    // If reports directory exists, derive report stats from files to reflect persisted reports
+    let reportsGenerated = Object.keys(this.lastReportTimes).length;
+    let lastReportTimes = { ...this.lastReportTimes };
+    const robotsSummary = {}; // { ROBOT_001: { total, critical, emergency, lastReportAt, lastReportType } }
+    try {
+      if (fs && fs.existsSync(this.reportsDir)) {
+        const files = fs.readdirSync(this.reportsDir).filter(f => f.endsWith('.txt') || f.endsWith('.json'));
+        reportsGenerated = files.length;
+        // attempt to read json files for timestamps if available
+        const times = {};
+        for (const f of files) {
+          try {
+            const p = path.join(this.reportsDir, f);
+            const stat = fs.statSync(p);
+            const base = f.replace(/\.(txt|json)$/,'');
+            times[base] = stat.mtime.toISOString();
+
+            // parse filename to extract type and robotId: e.g., CRITICAL_report_ROBOT_001_2025-... or emergency_report_ROBOT_001_...
+            const match = base.match(/^([A-Za-z]+)_report_(ROBOT_\d{3})_/);
+            if (match) {
+              const reportTypeRaw = match[1];
+              const robotId = match[2];
+              const reportType = reportTypeRaw.toUpperCase(); // CRITICAL or EMERGENCY
+              if (!robotsSummary[robotId]) {
+                robotsSummary[robotId] = { total: 0, critical: 0, emergency: 0, lastReportAt: null, lastReportType: null };
+              }
+              const entry = robotsSummary[robotId];
+              entry.total += 1;
+              if (reportType === 'CRITICAL') entry.critical += 1; else entry.emergency += 1;
+              const ts = stat.mtime.toISOString();
+              if (!entry.lastReportAt || ts > entry.lastReportAt) {
+                entry.lastReportAt = ts;
+                entry.lastReportType = reportType;
+              }
+            }
+          } catch (e) {}
+        }
+        lastReportTimes = times;
+      }
+    } catch (e) {
+      // ignore filesystem errors
+    }
+
+    // poweredOffRobots with remaining seconds
+    const poweredOff = {};
+    try {
+      const now = Date.now();
+      Object.keys(this.poweredOffRobots || {}).forEach((rid) => {
+        const expireISO = this.poweredOffRobots[rid];
+        const remainMs = new Date(expireISO).getTime() - now;
+        poweredOff[rid] = {
+          expireAt: expireISO,
+          remainingSec: Math.max(0, Math.round(remainMs / 1000))
+        };
+      });
+    } catch (_) {}
+
+    // 通知システムの統計（同一プロセス内のシングルトンから取得できる場合）
+    let notificationStats = null;
+    try {
+      if (!getFactoryManagerNotification && typeof window === 'undefined') {
+        try {
+          getFactoryManagerNotification = require('./factoryManagerNotification').getFactoryManagerNotification;
+        } catch (e) {
+          // ignore
+        }
+      }
+      if (getFactoryManagerNotification) {
+        const fm = getFactoryManagerNotification();
+        if (fm && typeof fm.getNotificationStats === 'function') {
+          notificationStats = fm.getNotificationStats();
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
     return {
       isRunning: this.isRunning,
       monitoringInterval: this.monitoringInterval ? '5 seconds' : 'stopped',
-      reportsGenerated: Object.keys(this.lastReportTimes).length,
-      lastReportTimes: this.lastReportTimes
+      reportsGenerated,
+      lastReportTimes,
+      robotsSummary,
+      poweredOffRobots: poweredOff,
+      notifications: notificationStats
     };
   }
 }
